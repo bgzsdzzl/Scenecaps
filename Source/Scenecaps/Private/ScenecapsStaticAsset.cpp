@@ -105,7 +105,7 @@ TArray<AActor*> UScenecapsStaticAsset::SpawnCollectionEx(
             Processed.Add(BaseEntry.EntryId);
 
             const FScenecapsBakedEntry Entry = ApplyVariantToEntry(BaseEntry, VariantName);
-            const FTransform FinalWorld = Entry.RelativeTransform * ParentWorld;
+            const FTransform FinalWorld = ParentWorld * Entry.RelativeTransform;
             const bool bShouldSpawn = (Entry.bVisible || bIncludeHidden) && !bParentSkipped;
 
             if (bShouldSpawn && Entry.ActorClass)

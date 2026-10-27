@@ -151,7 +151,7 @@ TArray<AActor*> UScenecapsAsset::SpawnCollectionEx(
             // ★ 变体应用：所有下游都基于实际使用的 Entry
             const FScenecapsEntry Entry = ApplyVariantToEntry(BaseEntry, VariantName);
 
-            const FTransform FinalWorld = Entry.RelativeTransform * ParentWorld;
+            const FTransform FinalWorld = ParentWorld * Entry.RelativeTransform;
             const bool bShouldSpawn = (Entry.bVisible || bIncludeHidden) && !bParentSkipped;
 
             if (bShouldSpawn && !Entry.Asset.IsNull())

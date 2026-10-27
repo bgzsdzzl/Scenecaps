@@ -263,7 +263,7 @@ bool FScenecapsEditorCommands::ExportToCustomBinary(UScenecapsStaticAsset* Asset
 
     bool bSuccess = true;
     auto Write = [&](auto&& Value) {
-        if (FileWriter->Serialize(&Value, sizeof(Value)) != sizeof(Value)) bSuccess = false;
+        FileWriter->Serialize(&Value, sizeof(Value));
     };
 
     const char Magic[4] = { 'S', 'C', 'N', 'B' };
@@ -335,6 +335,165 @@ bool FScenecapsEditorCommands::ExportToCustomBinary(UScenecapsStaticAsset* Asset
     else
     {
         UE_LOG(LogScenecaps, Error, TEXT("[Scenecaps] Failed to write custom binary: %s"), *OutFilename);
+    }
+
+    return bSuccess;
+}
+
+bool FScenecapsEditorCommands::ImportFromCustomBinary(UScenecapsStaticAsset* Asset)
+{
+    if (!Asset || !GEditor) return false;
+
+    IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+    if (!DesktopPlatform) return false;
+
+    void* ParentWindowHandle = nullptr;
+    if (FSlateApplication::IsInitialized())
+    {
+        if (TSharedPtr<SWindow> ActiveWindow = FSlateApplication::Get().GetActiveTopLevelWindow())
+            if (ActiveWindow->GetNativeWindow().IsValid())
+                ParentWindowHandle = ActiveWindow->GetNativeWindow()->GetOSWindowHandle();
+    }
+
+    const FString DefaultPath = FPaths::ProjectContentDir();
+    const FString FileTypes = TEXT("Scenecaps Binary (*.scnb)|*.scnb");
+
+    TArray<FString> OutFilenames;
+    if (!DesktopPlatform->OpenFileDialog(
+        ParentWindowHandle,
+        FString(TEXT("Import Scenecaps Static Asset from Custom Binary")),
+        DefaultPath,
+        FString(),
+        FileTypes,
+        0,
+        OutFilenames))
+    {
+        return false;
+    }
+    if (OutFilenames.IsEmpty()) return false;
+
+    const FString& InFilename = OutFilenames[0];
+
+    FArchive* FileReader = IFileManager::Get().CreateFileReader(*InFilename);
+    if (!FileReader) return false;
+
+    bool bSuccess = true;
+    auto Read = [&](auto&& Value) {
+        FileReader->Serialize(&Value, sizeof(Value));
+    };
+    auto ReadString = [&](FString& OutStr) {
+        int32 Len = 0;
+        FileReader->Serialize(&Len, sizeof(Len));
+        if (Len > 0)
+        {
+            int64 Need = static_cast<int64>(Len) * sizeof(TCHAR);
+            TArray<uint8> Bytes;
+            Bytes.AddUninitialized(Need);
+            FileReader->Serialize(Bytes.GetData(), Need);
+            OutStr = FString((TCHAR*)Bytes.GetData(), Len);
+        }
+        else
+        {
+            OutStr.Empty();
+        }
+    };
+
+    char Magic[4] = { 0 };
+    FileReader->Serialize(Magic, 4);
+    if (Magic[0] != 'S' || Magic[1] != 'C' || Magic[2] != 'N' || Magic[3] != 'B')
+    {
+        UE_LOG(LogScenecaps, Error, TEXT("[Scenecaps] Invalid magic in custom binary: %s"), *InFilename);
+        delete FileReader;
+        return false;
+    }
+
+    uint32 Version = 0;
+    FileReader->Serialize(&Version, sizeof(Version));
+    if (Version != 1)
+    {
+        UE_LOG(LogScenecaps, Error, TEXT("[Scenecaps] Unsupported custom binary version %u (expected 1)"), Version);
+        delete FileReader;
+        return false;
+    }
+
+    FGuid RootId;
+    FileReader->Serialize(&RootId, sizeof(RootId));
+
+    int32 Count = 0;
+    FileReader->Serialize(&Count, sizeof(Count));
+
+    TArray<FScenecapsBakedEntry> NewEntries;
+    NewEntries.Reserve(Count);
+
+    for (int32 i = 0; i < Count; ++i)
+    {
+        FScenecapsBakedEntry Entry;
+
+        FileReader->Serialize(&Entry.EntryId, sizeof(Entry.EntryId));
+        FileReader->Serialize(&Entry.ParentId, sizeof(Entry.ParentId));
+
+        uint8 Flags = 0;
+        FileReader->Serialize(&Flags, sizeof(Flags));
+        Entry.bVisible = (Flags & 0x01) != 0;
+        Entry.bLocked = (Flags & 0x02) != 0;
+
+        ReadString(Entry.DisplayName);
+        FileReader->Serialize(&Entry.RelativeTransform, sizeof(Entry.RelativeTransform));
+
+        FString ClassPath;
+        ReadString(ClassPath);
+        if (!ClassPath.IsEmpty())
+        {
+            Entry.ActorClass = LoadObject<UClass>(nullptr, *ClassPath);
+        }
+
+        FString MatPath;
+        ReadString(MatPath);
+        if (!MatPath.IsEmpty())
+        {
+            Entry.MaterialOverride = FSoftObjectPath(MatPath);
+        }
+
+        FileReader->Serialize(&Entry.MaterialSlotIndex, sizeof(Entry.MaterialSlotIndex));
+
+        int32 PropsNum = 0;
+        FileReader->Serialize(&PropsNum, sizeof(PropsNum));
+        if (PropsNum > 0)
+        {
+            Entry.SerializedActorProperties.AddUninitialized(PropsNum);
+            FileReader->Serialize(Entry.SerializedActorProperties.GetData(), PropsNum);
+        }
+
+        FString DLPath;
+        ReadString(DLPath);
+        if (!DLPath.IsEmpty())
+        {
+            Entry.DataLayer = FSoftObjectPath(DLPath);
+        }
+
+        if (!bSuccess) break;
+
+        NewEntries.Add(MoveTemp(Entry));
+    }
+
+    if (FileReader->GetError())
+    {
+        bSuccess = false;
+    }
+
+    delete FileReader;
+
+    if (bSuccess)
+    {
+        Asset->Modify();
+        Asset->RootId = RootId;
+        Asset->Entries = MoveTemp(NewEntries);
+        Asset->MarkPackageDirty();
+        UE_LOG(LogScenecaps, Log, TEXT("[Scenecaps] Imported static asset '%s' from custom binary: %s (%d entries)"), *Asset->GetName(), *InFilename, Asset->Entries.Num());
+    }
+    else
+    {
+        UE_LOG(LogScenecaps, Error, TEXT("[Scenecaps] Failed to read custom binary: %s"), *InFilename);
     }
 
     return bSuccess;

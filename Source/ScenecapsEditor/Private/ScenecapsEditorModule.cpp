@@ -172,6 +172,16 @@ void FScenecapsEditorModule::RegisterContentBrowserMenus()
                             for (UScenecapsStaticAsset* A : StaticAssets)
                                 FScenecapsEditorCommands::ExportToCustomBinary(A);
                         })));
+
+                InSection.AddMenuEntry("Scenecaps_ImportCustomBinary",
+                    FText::FromString(TEXT("Import from Custom Binary")),
+                    FText::FromString(TEXT("Import entries from a custom binary file (.scnb) into this Static asset")),
+                    FSlateIcon(),
+                    FUIAction(FExecuteAction::CreateLambda([StaticAssets]()
+                        {
+                            for (UScenecapsStaticAsset* A : StaticAssets)
+                                FScenecapsEditorCommands::ImportFromCustomBinary(A);
+                        })));
             }
         }));
 
