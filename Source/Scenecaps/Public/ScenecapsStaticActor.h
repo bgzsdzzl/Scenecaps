@@ -29,7 +29,7 @@ public:
     TSoftObjectPtr<UDataLayerAsset> TargetDataLayer;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Scene Collection|World Partition",
-        meta = (EditCondition = "!TargetDataLayer.IsNull()"))
+        meta = (EditCondition = "TargetDataLayer != nullptr"))
     bool bSpawnOnDataLayerLoaded = false;
 
     UFUNCTION(BlueprintCallable, Category = "Scene Collection")

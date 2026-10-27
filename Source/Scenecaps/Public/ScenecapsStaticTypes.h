@@ -69,7 +69,7 @@ struct SCENECAPS_API FScenecapsBakedEntry
     TSoftObjectPtr<UMaterialInterface> MaterialOverride;
 
     UPROPERTY(EditAnywhere, Category = "Scenecaps|Material Override",
-        meta = (EditCondition = "!MaterialOverride.IsNull()", ClampMin = "-1"))
+        meta = (EditCondition = "MaterialOverride != nullptr", ClampMin = "-1"))
     int32 MaterialSlotIndex = 0;
 
     UPROPERTY(EditAnywhere, Category = "Scenecaps|World Partition")

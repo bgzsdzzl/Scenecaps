@@ -1,0 +1,21 @@
+# Unreal Engine build artifacts
+Intermediate/
+Binaries/
+DerivedDataCache/
+Saved/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.sln
+*.suo
+*.user
+*.VC.db
+
+# UE generated project files
+*.vcxproj
+*.vcxproj.filters
+
+# OS
+Thumbs.db
+desktop.ini

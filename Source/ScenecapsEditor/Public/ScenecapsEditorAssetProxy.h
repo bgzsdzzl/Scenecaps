@@ -38,7 +38,7 @@ struct FScenecapsEditorEntryView
     UPROPERTY(EditAnywhere, Category = "Material Override")
     TSoftObjectPtr<UMaterialInterface> MaterialOverride;
     UPROPERTY(EditAnywhere, Category = "Material Override",
-        meta = (EditCondition = "!MaterialOverride.IsNull()", ClampMin = "-1"))
+        meta = (EditCondition = "MaterialOverride != nullptr", ClampMin = "-1"))
     int32 MaterialSlotIndex = 0;
 
     UPROPERTY(EditAnywhere, Category = "World Partition")
