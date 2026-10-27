@@ -16,6 +16,14 @@
 #include "AssetToolsModule.h"
 #include "IAssetTools.h"
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "ScenecapsModule.h"
+#include "DesktopPlatformModule.h"
+#include "IDesktopPlatform.h"
+#include "HAL/FileManager.h"
+#include "Misc/Paths.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/SWindow.h"
+#include "UObject/SoftObjectPath.h"
 
 void FScenecapsEditorCommands::GatherFromSelection(UScenecapsAsset* Asset)
 {
@@ -213,4 +221,121 @@ UScenecapsStaticAsset* FScenecapsEditorCommands::ConvertToStatic(UScenecapsAsset
     FAssetRegistryModule::AssetCreated(NewAsset);
     NewAsset->MarkPackageDirty();
     return NewAsset;
+}
+
+bool FScenecapsEditorCommands::ExportToCustomBinary(UScenecapsStaticAsset* Asset)
+{
+    if (!Asset || !GEditor) return false;
+
+    IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+    if (!DesktopPlatform) return false;
+
+    void* ParentWindowHandle = nullptr;
+    if (FSlateApplication::IsInitialized())
+    {
+        if (TSharedPtr<SWindow> ActiveWindow = FSlateApplication::Get().GetActiveTopLevelWindow())
+            if (ActiveWindow->GetNativeWindow().IsValid())
+                ParentWindowHandle = ActiveWindow->GetNativeWindow()->GetOSWindowHandle();
+    }
+
+    const FString DefaultPath = FPaths::ProjectContentDir();
+    const FString DefaultFile = Asset->GetName() + TEXT(".scnb");
+    const FString FileTypes = TEXT("Scenecaps Binary (*.scnb)|*.scnb");
+
+    FString OutFilename;
+    TArray<FString> OutFilenames;
+    if (!DesktopPlatform->SaveFileDialog(
+        ParentWindowHandle,
+        FString::Printf(TEXT("Export %s to Custom Binary"), *Asset->GetName()),
+        DefaultPath,
+        DefaultFile,
+        FileTypes,
+        0,
+        OutFilenames))
+    {
+        return false;
+    }
+    OutFilename = OutFilenames.IsEmpty() ? FString() : OutFilenames[0];
+    if (OutFilename.IsEmpty()) return false;
+
+    FArchive* FileWriter = IFileManager::Get().CreateFileWriter(*OutFilename);
+    if (!FileWriter) return false;
+
+    bool bSuccess = true;
+    auto Write = [&](auto&& Value) {
+        if (FileWriter->Serialize(&Value, sizeof(Value)) != sizeof(Value)) bSuccess = false;
+    };
+
+    const char Magic[4] = { 'S', 'C', 'N', 'B' };
+    FileWriter->Serialize((void*)Magic, 4);
+
+    uint32 Version = 1;
+    FileWriter->Serialize(&Version, sizeof(Version));
+    FileWriter->Serialize(&Asset->RootId, sizeof(Asset->RootId));
+
+    int32 Count = Asset->Entries.Num();
+    FileWriter->Serialize(&Count, sizeof(Count));
+
+    auto WriteString = [FileWriter](const FString& Str) {
+        int32 Len = Str.Len();
+        FileWriter->Serialize(&Len, sizeof(Len));
+        if (Len > 0)
+        {
+            FileWriter->Serialize((void*)*Str, Len * sizeof(TCHAR));
+        }
+    };
+
+    for (const FScenecapsBakedEntry& E : Asset->Entries)
+    {
+        FScenecapsBakedEntry Entry = E;
+
+        FileWriter->Serialize(&Entry.EntryId, sizeof(Entry.EntryId));
+        FileWriter->Serialize(&Entry.ParentId, sizeof(Entry.ParentId));
+
+        uint8 Flags = 0;
+        if (Entry.bVisible) Flags |= 0x01;
+        if (Entry.bLocked) Flags |= 0x02;
+        FileWriter->Serialize(&Flags, sizeof(Flags));
+
+        WriteString(Entry.DisplayName);
+        FileWriter->Serialize(&Entry.RelativeTransform, sizeof(Entry.RelativeTransform));
+
+        UClass* Cls = Entry.ActorClass.Get();
+        FString ClassPath = Cls ? FSoftObjectPath(Cls).ToString() : FString();
+        WriteString(ClassPath);
+
+        FString MatPath = Entry.MaterialOverride.IsNull() ? FString() : Entry.MaterialOverride.ToSoftObjectPath().ToString();
+        WriteString(MatPath);
+
+        FileWriter->Serialize(&Entry.MaterialSlotIndex, sizeof(Entry.MaterialSlotIndex));
+
+        const TArray<uint8>& Props = Entry.SerializedActorProperties;
+        int32 PropsNum = Props.Num();
+        FileWriter->Serialize(&PropsNum, sizeof(PropsNum));
+        if (PropsNum > 0)
+        {
+            FileWriter->Serialize((void*)Props.GetData(), PropsNum);
+        }
+
+        FString DLPath = Entry.DataLayer.IsNull() ? FString() : Entry.DataLayer.ToSoftObjectPath().ToString();
+        WriteString(DLPath);
+    }
+
+    if (FileWriter->GetError())
+    {
+        bSuccess = false;
+    }
+
+    delete FileWriter;
+
+    if (bSuccess)
+    {
+        UE_LOG(LogScenecaps, Log, TEXT("[Scenecaps] Exported static asset '%s' to custom binary: %s"), *Asset->GetName(), *OutFilename);
+    }
+    else
+    {
+        UE_LOG(LogScenecaps, Error, TEXT("[Scenecaps] Failed to write custom binary: %s"), *OutFilename);
+    }
+
+    return bSuccess;
 }

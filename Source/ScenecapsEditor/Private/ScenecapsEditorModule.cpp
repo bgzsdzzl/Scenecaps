@@ -143,7 +143,7 @@ void FScenecapsEditorModule::RegisterContentBrowserMenus()
             if (StaticAssets.Num() > 0)
             {
                 InSection.AddMenuEntry("Scenecaps_PlaceStaticIntoLevel",
-                    SC_LOCTEXT(PlaceStaticIntoLevel, "Place into Level (Static)"),
+                    FText::FromString(TEXT("Place into Level (Static)")),
                     SC_LOCTEXT(PlaceStaticIntoLevelTip, "Spawn a Static Scenecaps container in the current level"),
                     FSlateIcon(),
                     FUIAction(FExecuteAction::CreateLambda([StaticAssets]()
@@ -153,7 +153,7 @@ void FScenecapsEditorModule::RegisterContentBrowserMenus()
                         })));
 
                 InSection.AddMenuEntry("Scenecaps_GatherStaticFromSelection",
-                    SC_LOCTEXT(GatherStaticFromSelection, "Gather from Selection (Static)"),
+                    FText::FromString(TEXT("Gather from Selection (Static)")),
                     SC_LOCTEXT(GatherStaticFromSelectionTip, "Bake selected Actors directly into this Static asset"),
                     FSlateIcon(),
                     FUIAction(FExecuteAction::CreateLambda([StaticAssets]()
@@ -161,9 +161,21 @@ void FScenecapsEditorModule::RegisterContentBrowserMenus()
                             for (UScenecapsStaticAsset* A : StaticAssets)
                                 FScenecapsEditorCommands::GatherStaticFromSelection(A);
                         })));
+
+                // [Export to Custom Binary menu entry]
+                InSection.AddMenuEntry("Scenecaps_ExportCustomBinary",
+                    FText::FromString(TEXT("Export to Custom Binary")),
+                    FText::FromString(TEXT("Export this Static Scene Collection to a custom binary format")),
+                    FSlateIcon(),
+                    FUIAction(FExecuteAction::CreateLambda([StaticAssets]()
+                        {
+                            for (UScenecapsStaticAsset* A : StaticAssets)
+                                FScenecapsEditorCommands::ExportToCustomBinary(A);
+                        })));
             }
         }));
-}
+
+    }
 
 void FScenecapsEditorModule::RegisterConsoleCommands()
 {

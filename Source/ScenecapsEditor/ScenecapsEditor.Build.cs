@@ -31,7 +31,8 @@ public class ScenecapsEditor : ModuleRules
             "LevelEditor",
             "AppFramework",
             "InputCore",
-            "ContentBrowser"        // ← 新增：Content Browser 右键菜单
+            "ContentBrowser",        // ← Content Browser 右键菜单
+            "DesktopPlatform"        // ← 新增：文件保存对话框（自定义二进制导出）
         });
     }
 }

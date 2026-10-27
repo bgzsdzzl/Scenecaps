@@ -8,6 +8,7 @@
 #include "CollisionQueryParams.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Editor.h"
+#include "DrawDebugHelpers.h"
 
 FScenecapsEditorViewportClient::FScenecapsEditorViewportClient(
     FPreviewScene* InPreviewScene,
@@ -47,6 +48,44 @@ void FScenecapsEditorViewportClient::Tick(float DeltaSeconds)
     FEditorViewportClient::Tick(DeltaSeconds);
     if (TSharedPtr<FScenecapsEditorToolkit> Toolkit = ToolkitPtr.Pin())
         Toolkit->UpdateCachedEditorView(GetViewLocation(), GetViewRotation());
+
+    // 选中条目后，在视口里画 XYZ 坐标轴箭头 + 包围盒块
+    if (SelectedActors.Num() > 0)
+    {
+        if (TSharedPtr<FScenecapsEditorToolkit> Toolkit = ToolkitPtr.Pin())
+            if (FPreviewScene* Scene = Toolkit->GetPreviewScene())
+                if (UWorld* World = Scene->GetWorld())
+                {
+                    const float AxisLength = 60.f;
+                    const float Thickness = 2.f;
+                    for (const TWeakObjectPtr<AActor>& ActorPtr : SelectedActors)
+                    {
+                        AActor* Actor = ActorPtr.Get();
+                        if (!Actor || !IsValid(Actor)) continue;
+
+                        const FVector Loc = Actor->GetActorLocation();
+                        const FRotator Rot = Actor->GetActorRotation();
+
+                        const FVector XDir = Rot.RotateVector(FVector::ForwardVector);
+                        const FVector YDir = Rot.RotateVector(FVector::RightVector);
+                        const FVector ZDir = Rot.RotateVector(FVector::UpVector);
+
+                        DrawDebugDirectionalArrow(World, Loc, Loc + XDir * AxisLength, 8.f, FColor::Red, false, 0.f, 0, Thickness);
+                        DrawDebugDirectionalArrow(World, Loc, Loc + YDir * AxisLength, 8.f, FColor::Green, false, 0.f, 0, Thickness);
+                        DrawDebugDirectionalArrow(World, Loc, Loc + ZDir * AxisLength, 8.f, FColor::Blue, false, 0.f, 0, Thickness);
+
+                        const FBox Box = Actor->GetComponentsBoundingBox(true);
+                        if (Box.IsValid)
+                        {
+                            DrawDebugBox(World, Box.GetCenter(), Box.GetExtent(), FColor::Yellow, false, 0.f, 0, 2.f);
+                        }
+                        else
+                        {
+                            DrawDebugBox(World, Loc, FVector(15.f), FColor::Yellow, false, 0.f, 0, 2.f);
+                        }
+                    }
+                }
+    }
 }
 
 void FScenecapsEditorViewportClient::RequestRedraw() { Invalidate(); }

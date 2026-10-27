@@ -20,4 +20,7 @@ public:
 
     // 引用 → 静态
     static UScenecapsStaticAsset* ConvertToStatic(UScenecapsAsset* SourceAsset);
+
+    // 导出为自定义二进制格式（.scnb）
+    static bool ExportToCustomBinary(UScenecapsStaticAsset* Asset);
 };
