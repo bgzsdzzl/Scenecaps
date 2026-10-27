@@ -15,12 +15,7 @@ public class Scenecaps : ModuleRules
             "Engine"        // ← WorldPartition / DataLayer 的所有类型都在这里
         });
 
-        PrivateDependencyModuleNames.AddRange(new string[]
-        {
-            "Json",
-            "JsonUtilities",
-            "Projects"
-        });
+        PrivateDependencyModuleNames.AddRange(new string[] { "Json", "JsonUtilities", "Projects" });
 
         bool bEnableNiagaraHandler = true;
 

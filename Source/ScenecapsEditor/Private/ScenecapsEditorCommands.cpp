@@ -337,8 +337,12 @@ bool FScenecapsEditorCommands::ExportToCustomBinary(UScenecapsStaticAsset* Asset
         UE_LOG(LogScenecaps, Error, TEXT("[Scenecaps] Failed to write custom binary: %s"), *OutFilename);
     }
 
-    return bSuccess;
+return bSuccess;
 }
+
+// PCG 导出暂时禁用
+
+// PCG 导入暂时禁用
 
 bool FScenecapsEditorCommands::ImportFromCustomBinary(UScenecapsStaticAsset* Asset)
 {

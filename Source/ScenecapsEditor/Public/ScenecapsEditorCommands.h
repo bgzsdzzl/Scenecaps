@@ -24,4 +24,6 @@ public:
     // 自定义二进制导入/导出（.scnb）
     static bool ExportToCustomBinary(UScenecapsStaticAsset* Asset);
     static bool ImportFromCustomBinary(UScenecapsStaticAsset* Asset);
+
+    // PCG 互操作 (暂时禁用)
 };
