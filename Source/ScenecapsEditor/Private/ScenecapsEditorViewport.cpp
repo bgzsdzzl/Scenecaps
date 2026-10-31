@@ -1,13 +1,14 @@
 // Plugins/Scenecaps/Source/ScenecapsEditor/Private/ScenecapsEditorViewport.cpp
 
 #include "ScenecapsEditorViewport.h"
-#include "ScenecapsEditorViewportClient.h"
 #include "ScenecapsEditorToolkit.h"
-#include "LevelEditorViewport.h"
+#include "ScenecapsEditorViewportClient.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Editor.h"
+#include "AssetRegistry/AssetData.h"
+#include "DragAndDrop/AssetDragDropOp.h"
 
 void SScenecapsEditorViewport::Construct(const FArguments& InArgs)
 {
@@ -28,13 +29,40 @@ TSharedRef<FEditorViewportClient> SScenecapsEditorViewport::MakeEditorViewportCl
         }
     }
 
+    // Use custom viewport client that extends FEditorViewportClient with additional methods
+    // Pass the toolkit like the old working version
     ViewportClient = MakeShared<FScenecapsEditorViewportClient>(
-        nullptr,
         PreviewScene,
         SharedThis(this),
-        ToolkitPtr);
+        ToolkitPtr.Pin());
 
     return ViewportClient.ToSharedRef();
+}
+
+FReply SScenecapsEditorViewport::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)
+{
+    if (!ToolkitPtr.IsValid())
+    {
+        return FReply::Unhandled();
+    }
+
+    if (auto Toolkit = ToolkitPtr.Pin())
+    {
+        // Extract asset data from drag drop event
+        TArray<FAssetData> DroppedAssets;
+        if (TSharedPtr<FAssetDragDropOp> AssetDragDropOp = DragDropEvent.GetOperationAs<FAssetDragDropOp>())
+        {
+            DroppedAssets = AssetDragDropOp->GetAssets();
+        }
+        
+        if (DroppedAssets.Num() > 0)
+        {
+            TArrayView<FAssetData> AssetsView(DroppedAssets);
+            Toolkit->OnAssetsDropped(DragDropEvent, AssetsView);
+        }
+    }
+
+    return FReply::Handled();
 }
 
 void SScenecapsEditorViewport::AddCameraBookmark(const FScenecapsCameraBookmark& Bookmark)

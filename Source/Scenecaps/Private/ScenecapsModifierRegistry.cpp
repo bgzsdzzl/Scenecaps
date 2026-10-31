@@ -74,8 +74,7 @@ void UScenecapsModifierRegistry::SortGlobalModifiers()
             UScenecapsModifierBase* B = GlobalModifiers[j + 1].Get();
             if (A && B && A->GetPriority() > B->GetPriority())
             {
-                GlobalModifiers[j] = GlobalModifiers[j + 1];
-                GlobalModifiers[j + 1] = GlobalModifiers[j];
+                GlobalModifiers.Swap(j, j + 1);
             }
         }
     }

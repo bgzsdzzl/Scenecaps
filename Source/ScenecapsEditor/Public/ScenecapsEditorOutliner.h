@@ -120,8 +120,6 @@ private:
     TSet<FGuid> ComputeVisibleSet() const;
 
     const FSlateBrush* GetEntryIcon(const FGuid& EntryId) const;
-
-    FScenecapsEntry* FindEntry(const FGuid& EntryId) const;
     FText GetEntryDisplayName(const FGuid& EntryId) const;
     bool IsEntryVisible(const FGuid& EntryId) const;
     bool IsEntryLocked(const FGuid& EntryId) const;

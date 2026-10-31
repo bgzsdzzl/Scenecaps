@@ -58,10 +58,11 @@ public:
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Scenecaps|Modifier")
     void OnModifierExecuted(UScenecapsModifierBase* Modifier, FName Phase, FName VariantName);
 
-    // ---- 内部存储 ----
+// ---- 内部存储 ----
 
 protected:
-    TArray<UScenecapsModifierBase*> RegisteredModifiers;
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UScenecapsModifierBase>> RegisteredModifiers;
 
     void SortModifiersByPriority();
     void ExecuteModifiersInternal(FScenecapsModifierContext& Context);

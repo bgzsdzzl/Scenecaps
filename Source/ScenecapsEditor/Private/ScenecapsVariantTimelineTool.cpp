@@ -202,7 +202,9 @@ FReply SScenecapsVariantTimelineTool::OnStopClicked()
 
 void SScenecapsVariantTimelineTool::ApplyPreview(float Alpha)
 {
-    // Preview logic here
+    // WARNING: Not implemented - preview only shows UI, no visual interpolation
+    // To implement: Add ApplyInterpolatedToPreview to FScenecapsEditorAssetProxy
+    // and update PreviewActors (transform / visibility / material slot)
 }
 
 FText SScenecapsVariantTimelineTool::GetFromVariantText() const

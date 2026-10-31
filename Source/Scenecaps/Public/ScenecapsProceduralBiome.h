@@ -116,14 +116,12 @@ public:
         const FTransform& WorldTransform,
         int32 MaxInstances = 1000);
 
-    // 运行时生成到 ISM/HISM
-    UFUNCTION(BlueprintCallable, Category = "Scenecaps|Biome")
+// 运行时生成到 ISM/HISM (Not implemented yet)
     UInstancedStaticMeshComponent* GenerateToISM(
         UWorld* World,
         const FTransform& WorldTransform,
         AActor* ContainerActor = nullptr);
 
-    UFUNCTION(BlueprintCallable, Category = "Scenecaps|Biome")
     UHierarchicalInstancedStaticMeshComponent* GenerateToHISM(
         UWorld* World,
         const FTransform& WorldTransform,

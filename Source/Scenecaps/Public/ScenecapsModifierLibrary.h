@@ -49,8 +49,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Scenecaps|Modifier")
     static void RegisterModifierToAsset(UScenecapsAsset* Asset, UScenecapsModifierBase* Modifier);
 
-    UFUNCTION(BlueprintCallable, Category = "Scenecaps|Modifier")
-    static void UnregisterModifierFromAsset(UScenecapsModifierBase* Modifier);
+UFUNCTION(BlueprintCallable, Category = "Scenecaps|Modifier")
+    static void UnregisterModifierFromAsset(UScenecapsAsset* Asset, UScenecapsModifierBase* Modifier);
 
     // ---- Built-in Modifier Creation ----
 

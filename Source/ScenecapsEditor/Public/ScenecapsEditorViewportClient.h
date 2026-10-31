@@ -7,16 +7,14 @@
 
 class FPreviewScene;
 class FScenecapsEditorToolkit;
-class SScenecapsEditorViewport;
 
 class FScenecapsEditorViewportClient : public FEditorViewportClient
 {
 public:
     FScenecapsEditorViewportClient(
-        FEditorModeTools* InModeTools,
         FPreviewScene* InPreviewScene,
         const TSharedRef<SEditorViewport>& InViewport,
-        const TWeakPtr<FScenecapsEditorToolkit>& InToolkit);
+        const TSharedPtr<FScenecapsEditorToolkit>& InToolkit);
 
     virtual void Tick(float DeltaSeconds) override;
     virtual FLinearColor GetBackgroundColor() const override;
@@ -27,6 +25,7 @@ public:
     FEngineShowFlags* GetEngineShowFlagsPublic() const { return const_cast<FEngineShowFlags*>(&EngineShowFlags); }
     void RequestRedraw();
     void SetSelectedActors(const TArray<AActor*>& InActors);
+    void FocusViewportOnBox(const FBox& Box, bool bInstant = false);
     const TArray<TWeakObjectPtr<AActor>>& GetSelectedActors() const { return SelectedActors; }
 
 private:

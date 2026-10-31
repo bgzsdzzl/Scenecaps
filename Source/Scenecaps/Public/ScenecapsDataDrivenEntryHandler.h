@@ -24,7 +24,7 @@ public:
     void ReloadAll();
 
     int32 GetEntryCount() const;
-    const TArray<FScenecapsSCXEntry>& GetEntries() const { return Entries; }
+    TArray<FScenecapsSCXEntry> GetEntries() const; // Thread-safe: returns a copy while holding the lock
     TArray<FString> GetLoadedFiles() const;
     TArray<FString> GetErrors() const;
 

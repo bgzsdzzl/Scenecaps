@@ -30,8 +30,24 @@ void UScenecapsISMComponent::RegisterContainerActor(AActor* ContainerActor)
     RegisteredISMs.Empty();
     RegisteredHISMs.Empty();
 
-    ContainerActor->GetComponents<UInstancedStaticMeshComponent>(RegisteredISMs);
-    ContainerActor->GetComponents<UHierarchicalInstancedStaticMeshComponent>(RegisteredHISMs);
+    // Get all ISM components (including HISM since it derives from ISM)
+    TArray<UInstancedStaticMeshComponent*> AllISMs;
+    ContainerActor->GetComponents<UInstancedStaticMeshComponent>(AllISMs);
+
+    for (UInstancedStaticMeshComponent* Comp : AllISMs)
+    {
+        if (!Comp) continue;
+        
+        // Separate HISM from regular ISM
+        if (Comp->IsA<UHierarchicalInstancedStaticMeshComponent>())
+        {
+            RegisteredHISMs.Add(Cast<UHierarchicalInstancedStaticMeshComponent>(Comp));
+        }
+        else
+        {
+            RegisteredISMs.Add(Comp);
+        }
+    }
 }
 
 TArray<UInstancedStaticMeshComponent*> UScenecapsISMComponent::GetRegisteredISMs() const

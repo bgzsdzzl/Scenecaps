@@ -23,9 +23,30 @@ TArray<FScenecapsBiomeEntry> UScenecapsBiomeAsset::QueryEntriesAtLocation(
 
     float Slope = 0.0f;
     float Height = WorldLocation.Z;
+    bool bHasSlopeData = false;
 
-    // Landscape normal calculation skipped for compilation
-    // if (Landscape) { ... }
+    // Calculate slope if we have a World and Landscape
+    if (World && Landscape)
+    {
+        FVector TraceStart = WorldLocation + FVector(0, 0, 1000.0f);
+        FVector TraceEnd = WorldLocation - FVector(0, 0, 1000.0f);
+        
+        FHitResult HitResult;
+        FCollisionQueryParams QueryParams;
+        QueryParams.AddIgnoredActor(Landscape);
+        
+        if (World->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
+        {
+            if (HitResult.bBlockingHit && HitResult.Normal.SizeSquared() > 0.0f)
+            {
+                FVector UpVector = FVector::UpVector;
+                float DotProduct = FMath::Clamp(HitResult.Normal | UpVector, -1.0f, 1.0f);
+                Slope = FMath::RadiansToDegrees(FMath::Acos(DotProduct));
+                bHasSlopeData = true;
+            }
+        }
+    }
+    // If no landscape or trace failed, we don't have slope data
 
     for (const FScenecapsBiomeLayer& Layer : Layers)
     {
@@ -33,7 +54,17 @@ TArray<FScenecapsBiomeEntry> UScenecapsBiomeAsset::QueryEntriesAtLocation(
 
         for (const FScenecapsBiomeEntry& Entry : Layer.Entries)
         {
-            if (Slope < Entry.MinSlope || Slope > Entry.MaxSlope) continue;
+            // Only filter by slope if we have valid slope data
+            if (bHasSlopeData)
+            {
+                if (Slope < Entry.MinSlope || Slope > Entry.MaxSlope) continue;
+            }
+            else
+            {
+                // If no slope data, skip slope filter unless entry has explicit slope constraints
+                if (Entry.MinSlope > 0.0f || Entry.MaxSlope < 90.0f) continue;
+            }
+            
             if (Height < Entry.MinHeight || Height > Entry.MaxHeight) continue;
 
             float MaskWeight = 1.0f;
@@ -146,6 +177,7 @@ UInstancedStaticMeshComponent* UScenecapsBiomeSamplerComponent::GenerateToISM(
     const FTransform& WorldTransform,
     AActor* ContainerActor)
 {
+    // Not implemented yet - use PreviewGenerate + SpawnCollectionAsISM from UScenecapsAsset
     return nullptr;
 }
 
@@ -154,6 +186,7 @@ UHierarchicalInstancedStaticMeshComponent* UScenecapsBiomeSamplerComponent::Gene
     const FTransform& WorldTransform,
     AActor* ContainerActor)
 {
+    // Not implemented yet - use PreviewGenerate + SpawnCollectionAsHISM from UScenecapsAsset
     return nullptr;
 }
 

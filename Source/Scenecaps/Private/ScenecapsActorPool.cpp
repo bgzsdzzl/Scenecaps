@@ -28,7 +28,7 @@ void UScenecapsActorPoolComponent::EndPlay(const EEndPlayReason::Type EndPlayRea
     // 销毁所有池中的 Actor
     for (FScenecapsPooledActor& Pooled : PooledActors)
     {
-        if (Pooled.Actor && Pooled.Actor->IsValidLowLevel())
+        if (Pooled.Actor && IsValid(Pooled.Actor))
         {
             Pooled.Actor->Destroy();
         }
@@ -168,7 +168,7 @@ void UScenecapsActorPoolComponent::CleanupIdleActors()
     {
         FScenecapsPooledActor& Pooled = PooledActors[i];
         
-        if (!Pooled.bInUse && Pooled.Actor && Pooled.Actor->IsValidLowLevel())
+        if (!Pooled.bInUse && Pooled.Actor && IsValid(Pooled.Actor))
         {
             if (CurrentTime - Pooled.LastUsedTime > MaxIdleTimeSeconds)
             {

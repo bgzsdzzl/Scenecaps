@@ -8,6 +8,7 @@
 #include "ScenecapsEditorAssetProxy.h"
 #include "AssetRegistry/AssetData.h"
 #include "Containers/ArrayView.h"
+#include "ScenecapsEditorOutliner.h"
 
 class AActor;
 class SScenecapsEditorViewport;

@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "ScenecapsEntryHandler.h"
 
-class FScenecapsBlueprintEntryHandler : public IScenecapsEntryHandler
+class SCENECAPS_API FScenecapsBlueprintEntryHandler : public IScenecapsEntryHandler
 {
 public:
     virtual bool CanHandleAsset(const UObject* Asset) const override;
@@ -12,7 +12,7 @@ public:
     virtual UObject* ResolveAssetFromActor(AActor* Actor) const override;
 };
 
-class FScenecapsClassEntryHandler : public IScenecapsEntryHandler
+class SCENECAPS_API FScenecapsClassEntryHandler : public IScenecapsEntryHandler
 {
 public:
     virtual bool CanHandleAsset(const UObject* Asset) const override;
@@ -21,7 +21,7 @@ public:
     virtual UObject* ResolveAssetFromActor(AActor* Actor) const override;
 };
 
-class FScenecapsStaticMeshEntryHandler : public IScenecapsEntryHandler
+class SCENECAPS_API FScenecapsStaticMeshEntryHandler : public IScenecapsEntryHandler
 {
 public:
     virtual bool CanHandleAsset(const UObject* Asset) const override;
@@ -29,7 +29,7 @@ public:
     virtual UObject* ResolveAssetForStorage(UObject* DroppedObject) const override;
 };
 
-class FScenecapsSoundEntryHandler : public IScenecapsEntryHandler
+class SCENECAPS_API FScenecapsSoundEntryHandler : public IScenecapsEntryHandler
 {
 public:
     virtual bool CanHandleAsset(const UObject* Asset) const override;
@@ -38,7 +38,7 @@ public:
     virtual UObject* ResolveAssetFromActor(AActor* Actor) const override;
 };
 
-class FScenecapsNestedEntryHandler : public IScenecapsEntryHandler
+class SCENECAPS_API FScenecapsNestedEntryHandler : public IScenecapsEntryHandler
 {
 public:
     virtual bool CanHandleAsset(const UObject* Asset) const override;
@@ -48,7 +48,7 @@ public:
 };
 
 #if SCENE_COLLECTION_WITH_NIAGARA
-class FScenecapsNiagaraEntryHandler : public IScenecapsEntryHandler
+class SCENECAPS_API FScenecapsNiagaraEntryHandler : public IScenecapsEntryHandler
 {
 public:
     virtual bool CanHandleAsset(const UObject* Asset) const override;

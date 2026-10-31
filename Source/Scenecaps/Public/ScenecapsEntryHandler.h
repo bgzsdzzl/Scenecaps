@@ -61,7 +61,7 @@ public:
 /** 把 Context 里的覆盖字段应用到 Actor 的所有 PrimitiveComponent 上。 */
 SCENECAPS_API void ApplyEntryOverrides(AActor* Actor, const FScenecapsSpawnContext& Context);
 
-class FScenecapsMaterialEntryHandler : public IScenecapsEntryHandler
+class SCENECAPS_API FScenecapsMaterialEntryHandler : public IScenecapsEntryHandler
 {
 public:
     virtual bool CanHandleAsset(const UObject* Asset) const override;

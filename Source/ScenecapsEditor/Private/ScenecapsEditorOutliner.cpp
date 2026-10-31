@@ -917,8 +917,6 @@ FReply SScenecapsEditorOutliner::OnFocusSelected()
 
 // ---------- Lookup ----------
 
-FScenecapsEntry* SScenecapsEditorOutliner::FindEntry(const FGuid&) const { return nullptr; }  // 不再直接暴露
-
 FText SScenecapsEditorOutliner::GetEntryDisplayName(const FGuid& EntryId) const
 {
     if (auto Proxy = GetProxy(ToolkitPtr))

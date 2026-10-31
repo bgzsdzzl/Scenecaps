@@ -1,15 +1,18 @@
 // Plugins/Scenecaps/Source/ScenecapsEditor/Private/ScenecapsEditorToolkit.cpp
+
 #include "ScenecapsEditorToolkit.h"
 
 #include "ScenecapsEditorViewport.h"
 #include "ScenecapsEditorViewportClient.h"
-#include "ScenecapsEditorOutliner.h"
 #include "ScenecapsBatchEdit.h"
 #include "ScenecapsEditorModule.h"
 #include "ScenecapsLocalization.h"
 
 #include "DragAndDrop/AssetDragDropOp.h"
 #include "Engine/World.h"
+#include "Components/SkyAtmosphereComponent.h"
+#include "Components/SkyLightComponent.h"
+#include "Components/DirectionalLightComponent.h"
 #include "Framework/Docking/TabManager.h"
 #include "GameFramework/Actor.h"
 #include "IDetailsView.h"
@@ -22,9 +25,9 @@
 #include "UObject/StructOnScope.h"
 #include "Components/PrimitiveComponent.h"
 #include "Widgets/Layout/SBox.h"
-#include "Widgets/Text/STextBlock.h"
 #include "ScopedTransaction.h"
 #include "Editor.h"
+#include "AssetRegistry/AssetData.h"
 
 #define LOCTEXT_NAMESPACE "Scenecaps"
 
@@ -53,6 +56,38 @@ void FScenecapsEditorToolkit::InitEditor(const EToolkitMode::Type Mode,
     PreviewScene = MakeUnique<FPreviewScene>(CVS);
     PreviewScene->SetLightDirection(FRotator(-45.f, -30.f, 0.f));
     PreviewScene->SetLightColor(FColor::White);
+
+    // Configure sky atmosphere and lighting like the level editor viewport
+    if (UWorld* World = PreviewScene->GetWorld())
+    {
+        // Add Sky Atmosphere component to the world
+        USkyAtmosphereComponent* SkyAtmosphere = NewObject<USkyAtmosphereComponent>(World);
+        if (SkyAtmosphere)
+        {
+            SkyAtmosphere->RegisterComponentWithWorld(World);
+        }
+
+        // Configure the PreviewScene's built-in Sky Light to use real-time capture with Sky Atmosphere
+        USkyLightComponent* SkyLight = PreviewScene->SkyLight;
+        if (SkyLight && SkyAtmosphere)
+        {
+            SkyLight->SourceType = ESkyLightSourceType::SLS_CapturedScene;
+            SkyLight->SetIntensity(100.0f);  // 降低强度：1000 -> 100
+            SkyLight->bRealTimeCapture = true;
+            // SkyLight captures SkyAtmosphere automatically when in the same world
+            SkyLight->RecaptureSky();
+        }
+
+        // Configure directional light as atmosphere sun
+        UDirectionalLightComponent* LightComp = PreviewScene->DirectionalLight;
+        if (LightComp)
+        {
+            LightComp->SetIntensity(10000.0f);  // 降低强度：100000 -> 10000
+            LightComp->bAtmosphereSunLight = true;
+            LightComp->SetLightSourceAngle(0.53f); // Sun angular diameter
+            LightComp->SetWorldRotation(FRotator(-45.f, -30.f, 0.f).Quaternion());
+        }
+    }
 
     const TSharedRef<FTabManager::FLayout> Layout =
         FTabManager::NewLayout("ScenecapsEditor_Layout_v1")
@@ -182,7 +217,7 @@ void FScenecapsEditorToolkit::OnAssetsDropped(const FDragDropEvent& DragDropEven
 
     if (TSharedPtr<SScenecapsEditorViewport> Viewport = ViewportWidget.Pin())
     {
-        if (TSharedPtr<FScenecapsEditorViewportClient> Client = Viewport->GetViewportClient())
+        if (auto Client = Viewport->GetViewportClient())
         {
             FViewport* VP = Client->Viewport;
             if (VP)
@@ -190,7 +225,7 @@ void FScenecapsEditorToolkit::OnAssetsDropped(const FDragDropEvent& DragDropEven
                 const FGeometry& ViewportGeometry = Viewport->GetTickSpaceGeometry();
                 const FVector2D LocalPos = ViewportGeometry.AbsoluteToLocal(ScreenPos) * ViewportGeometry.Scale;
 
-                FSceneViewFamily::ConstructionValues CVS(VP, PreviewScene->GetWorld()->Scene, *Client->GetEngineShowFlagsPublic());
+                FSceneViewFamily::ConstructionValues CVS(VP, PreviewScene->GetWorld()->Scene, Client->EngineShowFlags);
                 FSceneViewFamilyContext ViewFamily(CVS);
                 FSceneView* View = Client->CalcSceneView(&ViewFamily);
 
@@ -313,8 +348,8 @@ AActor* FScenecapsEditorToolkit::SpawnPreviewEntry(const FScenecapsEditorEntryVi
 void FScenecapsEditorToolkit::RequestRedraw()
 {
     if (TSharedPtr<SScenecapsEditorViewport> Viewport = ViewportWidget.Pin())
-        if (TSharedPtr<FScenecapsEditorViewportClient> Client = Viewport->GetViewportClient())
-            Client->RequestRedraw();
+        if (auto Client = Viewport->GetViewportClient())
+            Client->Invalidate();
 }
 
 void FScenecapsEditorToolkit::RefreshLocalizedUI()
@@ -351,11 +386,11 @@ void FScenecapsEditorToolkit::SelectPreviewActor(const FGuid& EntryId)
     if (!Actor) return;
     if (TSharedPtr<SScenecapsEditorViewport> Viewport = ViewportWidget.Pin())
     {
-        if (TSharedPtr<FScenecapsEditorViewportClient> Client = Viewport->GetViewportClient())
+        if (auto Client = Viewport->GetScenecapsViewportClient())
         {
             Client->SetSelectedActors({ Actor });
             Client->FocusViewportOnBox(Actor->GetComponentsBoundingBox(true), true);
-            Client->RequestRedraw();
+            Client->Invalidate();
         }
     }
 }
@@ -400,7 +435,6 @@ void FScenecapsEditorToolkit::UpdatePreviewActor(const FGuid& EntryId)
             }
         }
     }
-    RequestRedraw();
 }
 
 void FScenecapsEditorToolkit::ReparentEntry(const FGuid& ChildId, const FGuid& NewParentId)

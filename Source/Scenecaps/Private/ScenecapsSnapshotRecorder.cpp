@@ -89,7 +89,7 @@ void UScenecapsSnapshotRecorder::BuildEntryFromActor(AActor* Actor, FScenecapsEn
 
     OutEntry.EntryId = FGuid::NewGuid();
     OutEntry.DisplayName = Actor->GetActorLabel();
-    OutEntry.RelativeTransform = RootTransform.GetRelativeTransform(Actor->GetActorTransform());
+    OutEntry.RelativeTransform = Actor->GetActorTransform().GetRelativeTransform(RootTransform);
     OutEntry.bVisible = !Actor->IsHidden();
     OutEntry.bLocked = false;
 

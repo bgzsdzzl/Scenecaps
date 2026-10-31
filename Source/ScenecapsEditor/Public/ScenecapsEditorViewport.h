@@ -1,13 +1,12 @@
 // Plugins/Scenecaps/Source/ScenecapsEditor/Public/ScenecapsEditorViewport.h
 
-#pragma once
-
 #include "CoreMinimal.h"
 #include "SEditorViewport.h"
-#include "LevelEditorViewport.h"
+#include "EditorViewportClient.h"
 #include "ScenecapsViewportConfig.h"
 
 class FScenecapsEditorToolkit;
+class FEditorViewportClient;
 class FScenecapsEditorViewportClient;
 
 class SScenecapsEditorViewport : public SEditorViewport
@@ -21,7 +20,8 @@ public:
 
     virtual TSharedRef<FEditorViewportClient> MakeEditorViewportClient() override;
 
-    TSharedPtr<FScenecapsEditorViewportClient> GetViewportClient() const { return ViewportClient; }
+    TSharedPtr<FEditorViewportClient> GetViewportClient() const { return ViewportClient; }
+    TSharedPtr<FScenecapsEditorViewportClient> GetScenecapsViewportClient() const { return StaticCastSharedPtr<FScenecapsEditorViewportClient>(ViewportClient); }
 
     // Camera bookmarks
     void AddCameraBookmark(const FScenecapsCameraBookmark& Bookmark);
@@ -34,9 +34,12 @@ public:
     void RemoveToolbarButton(FName ActionName);
     TArray<FScenecapsViewportToolbarButton> GetToolbarButtons() const;
 
+protected:
+    virtual FReply OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent) override;
+
 private:
     TWeakPtr<FScenecapsEditorToolkit> ToolkitPtr;
-    TSharedPtr<FScenecapsEditorViewportClient> ViewportClient;
+    TSharedPtr<FEditorViewportClient> ViewportClient;
     TArray<FScenecapsCameraBookmark> CameraBookmarks;
     TArray<FScenecapsViewportToolbarButton> ToolbarButtons;
 };

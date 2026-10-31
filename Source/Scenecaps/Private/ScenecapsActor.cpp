@@ -319,12 +319,11 @@ void AScenecapsActor::SetDataLayerActive(bool bActive)
 {
     if (!TargetDataLayer.IsNull())
     {
-        UWorld* World = GetWorld();
         if (UDataLayerManager* Manager = UDataLayerManager::GetDataLayerManager(GetWorld()))
         {
             if (UDataLayerAsset* Asset = TargetDataLayer.LoadSynchronous())
             {
-                if (const UDataLayerInstance* Instance = Manager->GetDataLayerInstanceFromAsset(TargetDataLayer.LoadSynchronous()))
+                if (const UDataLayerInstance* Instance = Manager->GetDataLayerInstanceFromAsset(Asset))
                 {
                     Manager->SetDataLayerInstanceRuntimeState(const_cast<UDataLayerInstance*>(Instance), bActive ? EDataLayerRuntimeState::Activated : EDataLayerRuntimeState::Unloaded);
                 }
@@ -374,7 +373,7 @@ void AScenecapsActor::ApplyModifiers(EScenecapsModifierPhase Phase, FName Varian
 {
     if (UScenecapsModifierManager* Mgr = GetOrCreateModifierManager())
     {
-        Mgr->ExecuteModifiers(CollectionAsset.Get(), Phase, VariantName, EntryId, this);
+        Mgr->ExecuteModifiers(CollectionAsset.LoadSynchronous(), Phase, VariantName, EntryId, this);
     }
 }
 
@@ -383,7 +382,7 @@ void AScenecapsActor::ApplyModifiersToActor(AActor* Actor, FName VariantName)
     if (!Actor) return;
     if (UScenecapsModifierManager* Mgr = GetOrCreateModifierManager())
     {
-        Mgr->ExecuteModifiersOnActor(Actor, CollectionAsset.Get(), VariantName);
+        Mgr->ExecuteModifiersOnActor(Actor, CollectionAsset.LoadSynchronous(), VariantName);
     }
 }
 

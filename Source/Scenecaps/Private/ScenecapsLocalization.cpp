@@ -1,4 +1,5 @@
 #include "ScenecapsLocalization.h"
+#include "ScenecapsModule.h"
 
 #include "Dom/JsonObject.h"
 #include "Internationalization/Culture.h"              // ← 新增：FCulture 完整定义
@@ -58,7 +59,7 @@ void FScenecapsLocalization::LoadFromFile(const FString& FilePath)
     const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonText);
     if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
     {
-        UE_LOG(LogTemp, Warning,
+        UE_LOG(LogScenecaps, Warning,
             TEXT("[Scenecaps] 无法解析本地化文件: %s"), *FilePath);
         return;
     }

@@ -6,6 +6,7 @@
 #include "Widgets/SCompoundWidget.h"
 #include "ScenecapsAsset.h"
 
+// WARNING: Timeline Tool is event-only, ApplyPreview is a stub - not implemented yet
 class SScenecapsVariantTimelineTool : public SCompoundWidget
 {
 public:
@@ -36,6 +37,7 @@ private:
     FReply OnStopClicked();
     void OnAlphaChanged(float InValue);
     void TickPlayback();
+    // WARNING: Not implemented - preview only shows UI, no visual interpolation
     void ApplyPreview(float Alpha);
 
     // Getters for Slate delegates

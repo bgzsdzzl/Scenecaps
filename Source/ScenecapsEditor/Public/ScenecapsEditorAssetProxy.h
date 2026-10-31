@@ -17,6 +17,9 @@ struct FScenecapsEditorEntryView
 {
     GENERATED_BODY()
 
+    // NOTE: Custom/Procedural params (FloatParams/VectorParams/ColorParams/BoolParams/ProceduralParams) 
+    // are runtime-only, not editable in editor UI yet
+
     UPROPERTY(VisibleAnywhere, Category = "Scenecaps") FGuid EntryId;
     UPROPERTY(VisibleAnywhere, Category = "Scenecaps") FGuid ParentId;
     UPROPERTY(EditAnywhere, Category = "Scenecaps")     FString DisplayName;

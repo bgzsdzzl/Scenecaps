@@ -6,5 +6,5 @@
 #include "UnrealEd.h"
 #include "EditorStyle.h"
 #include "SlateCore.h"
-#include "Slate.h'
+#include "Slate.h"
 #include "ScenecapsEditor.h"

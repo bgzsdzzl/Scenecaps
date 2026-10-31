@@ -62,10 +62,11 @@ void UScenecapsVariantTransitionComponent::Stop()
     if (!bIsPlaying) return;
 
     bIsPlaying = false;
+    bIsReversed = false;  // 重置反向标志，确保应用到 FromVariant
     ElapsedTime = 0.0f;
     CurrentAlpha = 0.0f;
 
-    // 可选：停止时重置到 FromVariant
+    // 停止时重置到 FromVariant
     ApplyCurrentInterpolation();
 }
 

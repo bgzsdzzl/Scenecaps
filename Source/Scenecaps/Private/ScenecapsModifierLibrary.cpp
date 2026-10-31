@@ -72,10 +72,12 @@ void UScenecapsModifierLibrary::RegisterModifierToAsset(UScenecapsAsset* Asset, 
     }
 }
 
-void UScenecapsModifierLibrary::UnregisterModifierFromAsset(UScenecapsModifierBase* Modifier)
+void UScenecapsModifierLibrary::UnregisterModifierFromAsset(UScenecapsAsset* Asset, UScenecapsModifierBase* Modifier)
 {
-    // Note: Need to know which asset's manager to unregister from
-    // This would require tracking which asset the modifier is registered to
+    if (Asset && Modifier && Asset->GetOrCreateModifierManager())
+    {
+        Asset->GetOrCreateModifierManager()->UnregisterModifier(Modifier);
+    }
 }
 
 UScenecapsTransformModifier* UScenecapsModifierLibrary::CreateTransformModifier(FVector LocationOffset, FRotator RotationOffset, FVector ScaleMultiplier)

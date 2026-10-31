@@ -615,7 +615,7 @@ TArray<FTransform> UScenecapsAsset::GenerateProceduralTransforms(
 // ISM/HISM Batch Spawn (UE 5.8 compatible)
 // ================================================================
 
-static void SetupISMForLumen(UInstancedStaticMeshComponent* ISM)
+static void SetupISMForLumen(UInstancedStaticMeshComponent* ISM, const FScenecapsSpawnContext& Context = FScenecapsSpawnContext())
 {
     if (!ISM || !ISM->GetStaticMesh()) return;
 
@@ -623,10 +623,11 @@ static void SetupISMForLumen(UInstancedStaticMeshComponent* ISM)
     ISM->SetAffectDistanceFieldLighting(true);        // 参与距离场光照（Lumen Surface Cache）
     ISM->SetAffectDynamicIndirectLighting(true);      // 参与动态间接光照
     ISM->SetCastShadow(true);                          // 投射阴影
-    ISM->SetLightingChannels(false, true, false);     // Static Lighting 通道
+    ISM->SetLightingChannels(true, false, false);     // Static Lighting 通道 (Channel 0 for default lights)
 
-    // 碰撞/导航
-    ISM->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    // 碰撞/导航 - 从 Context 读取，缺省保持硬编码值
+    ECollisionEnabled CollisionEnabled = Context.bOverrideCollision ? Context.CollisionEnabled : ECollisionEnabled::QueryAndPhysics;
+    ISM->SetCollisionEnabled(CollisionEnabled);
     ISM->SetGenerateOverlapEvents(false);
     ISM->SetCanEverAffectNavigation(false);
     ISM->bHasPerInstanceHitProxies = false;
@@ -635,16 +636,17 @@ static void SetupISMForLumen(UInstancedStaticMeshComponent* ISM)
     ISM->SetNumCustomDataFloats(4);
 }
 
-static void SetupHISMForLumen(UHierarchicalInstancedStaticMeshComponent* HISM)
+static void SetupHISMForLumen(UHierarchicalInstancedStaticMeshComponent* HISM, const FScenecapsSpawnContext& Context = FScenecapsSpawnContext())
 {
     if (!HISM || !HISM->GetStaticMesh()) return;
 
     HISM->SetAffectDistanceFieldLighting(true);
     HISM->SetAffectDynamicIndirectLighting(true);
     HISM->SetCastShadow(true);
-    HISM->SetLightingChannels(false, true, false);
+    HISM->SetLightingChannels(true, false, false);
 
-    HISM->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    ECollisionEnabled CollisionEnabled = Context.bOverrideCollision ? Context.CollisionEnabled : ECollisionEnabled::QueryAndPhysics;
+    HISM->SetCollisionEnabled(CollisionEnabled);
     HISM->SetGenerateOverlapEvents(false);
     HISM->SetCanEverAffectNavigation(false);
     HISM->bHasPerInstanceHitProxies = false;
@@ -694,17 +696,13 @@ UInstancedStaticMeshComponent* UScenecapsAsset::SpawnCollectionAsISM(UObject* Wo
 
 if (MeshToTransforms.Num() == 0) return nullptr;
 
-    // 2. 创建容器 Actor
+// 2. 创建容器 Actor
     AActor* ContainerActor = World->SpawnActor<AActor>();
     if (!ContainerActor) return nullptr;
     ContainerActor->SetActorLabel(FString::Printf(TEXT("ScenecapsISMContainer_%s"), *GetName()));
 
     // 添加运行时管理组件
     UScenecapsISMComponent* Manager = Cast<UScenecapsISMComponent>(ContainerActor->AddComponentByClass(UScenecapsISMComponent::StaticClass(), false, FTransform::Identity, false));
-    if (Manager)
-    {
-        Manager->RegisterContainerActor(ContainerActor);
-    }
 
     USceneComponent* Root = ContainerActor->GetRootComponent();
     if (!Root)
@@ -740,14 +738,18 @@ if (MeshToTransforms.Num() == 0) return nullptr;
             }
         }
 
-        SetupISMForLumen(ISM);
+        // 使用第一个 Context（如果有）配置 ISM 级别的设置
+        const FScenecapsSpawnContext* FirstCtx = (Contexts && Contexts->Num() > 0) ? &(*Contexts)[0] : nullptr;
+        SetupISMForLumen(ISM, FirstCtx ? *FirstCtx : FScenecapsSpawnContext());
 
         if (!FirstISM) FirstISM = ISM;
     }
 
-    // 注意：距离场由 StaticMesh 编辑器设置 "Generate Distance Fields" 控制
-    // 或通过 r.AOGlobalDistanceField 等 CVars 全局开启
-    // 运行时无法直接触发构建，需确保 Mesh 资产已勾选该选项
+    // 注册容器 Actor 到管理组件（在所有 ISM 创建之后）
+    if (Manager)
+    {
+        Manager->RegisterContainerActor(ContainerActor);
+    }
 
     return FirstISM;
 }
@@ -791,16 +793,12 @@ UHierarchicalInstancedStaticMeshComponent* UScenecapsAsset::SpawnCollectionAsHIS
 
 if (MeshToTransforms.Num() == 0) return nullptr;
 
-    AActor* ContainerActor = World->SpawnActor<AActor>();
+AActor* ContainerActor = World->SpawnActor<AActor>();
     if (!ContainerActor) return nullptr;
     ContainerActor->SetActorLabel(FString::Printf(TEXT("ScenecapsHISMContainer_%s"), *GetName()));
 
     // 添加运行时管理组件
     UScenecapsISMComponent* Manager = Cast<UScenecapsISMComponent>(ContainerActor->AddComponentByClass(UScenecapsISMComponent::StaticClass(), false, FTransform::Identity, false));
-    if (Manager)
-    {
-        Manager->RegisterContainerActor(ContainerActor);
-    }
 
     USceneComponent* Root = ContainerActor->GetRootComponent();
     if (!Root)
@@ -836,12 +834,18 @@ if (MeshToTransforms.Num() == 0) return nullptr;
             }
         }
 
-        SetupHISMForLumen(HISM);
+        SetupHISMForLumen(HISM, FirstCtx ? *FirstCtx : FScenecapsSpawnContext());
 
         // 强制重建 HISM 层级树（用于视锥剔除和 LOD 选择）
         HISM->BuildTreeIfOutdated(true, false);
 
         if (!FirstHISM) FirstHISM = HISM;
+    }
+
+    // 注册容器 Actor 到管理组件（在所有 HISM 创建之后）
+    if (Manager)
+    {
+        Manager->RegisterContainerActor(ContainerActor);
     }
 
     return FirstHISM;

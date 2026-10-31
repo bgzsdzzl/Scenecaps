@@ -12,7 +12,7 @@ UScenecapsModifierManager::UScenecapsModifierManager()
 void UScenecapsModifierManager::RegisterModifier(UScenecapsModifierBase* Modifier)
 {
     if (!Modifier) return;
-    if (RegisteredModifiers.Contains(Modifier)) return;
+    if (RegisteredModifiers.ContainsByPredicate([&](TObjectPtr<UScenecapsModifierBase> M) { return M.Get() == Modifier; })) return;
     RegisteredModifiers.AddUnique(Modifier);
     SortModifiersByPriority();
 }
@@ -20,7 +20,7 @@ void UScenecapsModifierManager::RegisterModifier(UScenecapsModifierBase* Modifie
 void UScenecapsModifierManager::UnregisterModifier(UScenecapsModifierBase* Modifier)
 {
     if (!Modifier) return;
-    RegisteredModifiers.Remove(Modifier);
+    RegisteredModifiers.RemoveAll([&](TObjectPtr<UScenecapsModifierBase> M) { return M.Get() == Modifier; });
 }
 
 void UScenecapsModifierManager::UnregisterModifierByName(FName ModifierName)
@@ -36,9 +36,9 @@ void UScenecapsModifierManager::ClearAllModifiers()
 TArray<UScenecapsModifierBase*> UScenecapsModifierManager::GetRegisteredModifiers() const
 {
     TArray<UScenecapsModifierBase*> Result;
-    for (UScenecapsModifierBase* M : RegisteredModifiers)
+    for (TObjectPtr<UScenecapsModifierBase> M : RegisteredModifiers)
     {
-        if (M) Result.Add(M);
+        if (M) Result.Add(M.Get());
     }
     return Result;
 }
@@ -51,12 +51,11 @@ void UScenecapsModifierManager::SortModifiersByPriority()
     {
         for (int32 j = 0; j < N - i - 1; ++j)
         {
-            UScenecapsModifierBase* A = RegisteredModifiers[j];
-            UScenecapsModifierBase* B = RegisteredModifiers[j + 1];
+            UScenecapsModifierBase* A = RegisteredModifiers[j].Get();
+            UScenecapsModifierBase* B = RegisteredModifiers[j + 1].Get();
             if (A && B && A->GetPriority() > B->GetPriority())
             {
-                RegisteredModifiers[j] = B;
-                RegisteredModifiers[j + 1] = A;
+                RegisteredModifiers.Swap(j, j + 1);
             }
         }
     }
@@ -77,7 +76,7 @@ void UScenecapsModifierManager::ExecuteModifiers(
     Context.VariantName = VariantName;
     Context.EntryId = EntryId;
     Context.Actor = Actor;
-    Context.World = Asset->GetWorld();
+    Context.World = Actor ? Actor->GetWorld() : nullptr;
 
     ExecuteModifiersInternal(Context);
 }
@@ -103,8 +102,9 @@ void UScenecapsModifierManager::ExecuteModifiersInternal(FScenecapsModifierConte
 {
     SortModifiersByPriority();
 
-    for (UScenecapsModifierBase* Modifier : RegisteredModifiers)
+    for (TObjectPtr<UScenecapsModifierBase> ModifierPtr : RegisteredModifiers)
     {
+        UScenecapsModifierBase* Modifier = ModifierPtr.Get();
         if (!Modifier) continue;
         if (!Modifier->CanExecute(Context)) continue;
 

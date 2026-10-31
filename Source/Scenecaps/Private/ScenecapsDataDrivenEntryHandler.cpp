@@ -376,6 +376,12 @@ int32 FScenecapsDataDrivenEntryHandler::GetEntryCount() const
     return Entries.Num();
 }
 
+TArray<FScenecapsSCXEntry> FScenecapsDataDrivenEntryHandler::GetEntries() const
+{
+    FScopeLock Guard(&Lock);
+    return Entries; // Return a copy while holding the lock
+}
+
 TArray<FString> FScenecapsDataDrivenEntryHandler::GetLoadedFiles() const
 {
     FScopeLock Guard(&Lock);
@@ -503,7 +509,13 @@ void FScenecapsDataDrivenEntryHandler::ApplyPropertyOverride(
             }
         }
 
-        if (PropTarget == Target) return; // 没找到组件直接返回
+        if (PropTarget == Target)
+        {
+            UE_LOG(LogScenecaps, Warning,
+                TEXT("[DataDriven] Component '%s' not found on %s for property '%s'"),
+                *Prop.CachedComponentName.ToString(), *Target->GetName(), *Prop.Path);
+            return; // 没找到组件直接返回
+        }
     }
 
     // ★ 直接使用缓存的 FProperty
