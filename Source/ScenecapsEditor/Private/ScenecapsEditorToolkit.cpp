@@ -22,6 +22,7 @@
 #include "UObject/StructOnScope.h"
 #include "Components/PrimitiveComponent.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Text/STextBlock.h"
 #include "ScopedTransaction.h"
 #include "Editor.h"
 
@@ -98,9 +99,13 @@ void FScenecapsEditorToolkit::UnregisterTabSpawners(const TSharedRef<FTabManager
 
 TSharedRef<SDockTab> FScenecapsEditorToolkit::SpawnTab_Viewport(const FSpawnTabArgs&)
 {
-    if (!ViewportSettings.IsValid())
+    if (!AssetProxy.IsValid() || !ViewportSettings.IsValid())
     {
         ViewportSettings = MakeShared<UScenecapsViewportSettings>();
+    }
+    if (!AssetProxy.IsValid())
+    {
+        return MakeTab(ViewportTabId, SC_LOCTEXT(ViewportTabLabel, "Viewport"), SNew(STextBlock).Text(SC_LOCTEXT(InvalidAsset, "Invalid Asset")));
     }
     TSharedRef<SScenecapsEditorViewport> Viewport = SNew(SScenecapsEditorViewport)
         .Toolkit(SharedThis(this))
@@ -119,6 +124,10 @@ TSharedRef<SDockTab> FScenecapsEditorToolkit::SpawnTab_Viewport(const FSpawnTabA
 
 TSharedRef<SDockTab> FScenecapsEditorToolkit::SpawnTab_Outliner(const FSpawnTabArgs&)
 {
+    if (!AssetProxy.IsValid())
+    {
+        return MakeTab(OutlinerTabId, SC_LOCTEXT(OutlinerTabLabel, "Outliner"), SNew(STextBlock).Text(SC_LOCTEXT(InvalidAsset, "Invalid Asset")));
+    }
     TSharedRef<SScenecapsEditorOutliner> Outliner = SNew(SScenecapsEditorOutliner).Toolkit(SharedThis(this));
     OutlinerWidget = Outliner;
     return MakeTab(OutlinerTabId, SC_LOCTEXT(OutlinerTabLabel, "Outliner"), Outliner);
@@ -126,6 +135,10 @@ TSharedRef<SDockTab> FScenecapsEditorToolkit::SpawnTab_Outliner(const FSpawnTabA
 
 TSharedRef<SDockTab> FScenecapsEditorToolkit::SpawnTab_Details(const FSpawnTabArgs&)
 {
+    if (!AssetProxy.IsValid())
+    {
+        return MakeTab(DetailsTabId, SC_LOCTEXT(DetailsTabLabel, "Details"), SNew(STextBlock).Text(SC_LOCTEXT(InvalidAsset, "Invalid Asset")));
+    }
     FPropertyEditorModule& PropModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
 
     FDetailsViewArgs DetailsArgs;
