@@ -141,14 +141,12 @@ struct FScenecapsViewportLayoutSection
 };
 
 // Per-asset viewport settings
-UCLASS(BlueprintType, Blueprintable, config = EditorPerProjectUserSettings, meta = (DisplayName = "Scenecaps Viewport Settings"), MinimalAPI)
+UCLASS(BlueprintType, Blueprintable, config = EditorPerProjectUserSettings, meta = (DisplayName = "Scenecaps Viewport Settings"))
 class UScenecapsViewportSettings : public UObject
 {
     GENERATED_BODY()
 
 public:
-    UScenecapsViewportSettings();
-
     // ---- Render ----
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Render", config)
