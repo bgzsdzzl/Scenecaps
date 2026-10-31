@@ -25,6 +25,11 @@ FScenecapsEditorViewportClient::FScenecapsEditorViewportClient(
     SetRealtime(true);
     EngineShowFlags.SetCompositeEditorPrimitives(true);
     EngineShowFlags.SetSelectionOutline(true);
+    
+    // 设置网格大小（通过编辑器设置）
+    // 注意：GridSettings 是受保护成员，子类可访问
+    // GridSettings.GridColor = FLinearColor(0.3f, 0.3f, 0.3f, 0.5f);
+    // GridSettings.GridSize = 100.0f;
 }
 
 void FScenecapsEditorViewportClient::Tick(float DeltaSeconds)
