@@ -11,7 +11,7 @@
 void SScenecapsEditorViewport::Construct(const FArguments& InArgs)
 {
     ToolkitPtr = InArgs._Toolkit;
-    
+
     SEditorViewport::Construct(SEditorViewport::FArguments());
 }
 
@@ -32,6 +32,13 @@ TSharedRef<FEditorViewportClient> SScenecapsEditorViewport::MakeEditorViewportCl
         PreviewScene,
         SharedThis(this),
         ToolkitPtr);
+
+    // Apply default viewport settings: black background, grid enabled
+    if (ViewportClient.IsValid())
+    {
+        ViewportClient->EngineShowFlags.SetGrid(true);
+        ViewportClient->SetRealtime(true);
+    }
 
     return ViewportClient.ToSharedRef();
 }
