@@ -39,7 +39,7 @@ public:
     UObject* GetEditingAssetObject() const { return AssetProxy.IsValid() ? AssetProxy->GetAssetObject() : nullptr; }
 
     TWeakPtr<SScenecapsEditorViewport> GetViewportWidget() const { return ViewportWidget; }
-    TSharedPtr<UScenecapsViewportSettings> GetViewportSettings() const { return ViewportSettings; }
+    TObjectPtr<UScenecapsViewportSettings> GetViewportSettings() const { return ViewportSettings; }
 
     FName GetPreviewVariant() const { return PreviewVariant; }
     void  SetPreviewVariant(FName InVariant);
@@ -106,7 +106,7 @@ private:
     FRotator CachedEditorViewRotation = FRotator::ZeroRotator;
     bool bEditorViewDirty = false;
 
-    TSharedPtr<UScenecapsViewportSettings> ViewportSettings;
+    TObjectPtr<UScenecapsViewportSettings> ViewportSettings;
 
     static const FName ViewportTabId;
     static const FName OutlinerTabId;

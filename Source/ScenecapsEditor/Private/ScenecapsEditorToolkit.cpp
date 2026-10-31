@@ -99,14 +99,16 @@ void FScenecapsEditorToolkit::UnregisterTabSpawners(const TSharedRef<FTabManager
 
 TSharedRef<SDockTab> FScenecapsEditorToolkit::SpawnTab_Viewport(const FSpawnTabArgs&)
 {
-    if (!AssetProxy.IsValid() || !ViewportSettings.IsValid())
-    {
-        ViewportSettings = MakeShared<UScenecapsViewportSettings>();
-    }
     if (!AssetProxy.IsValid())
     {
         return MakeTab(ViewportTabId, SC_LOCTEXT(ViewportTabLabel, "Viewport"), SNew(STextBlock).Text(SC_LOCTEXT(InvalidAsset, "Invalid Asset")));
     }
+
+    if (!ViewportSettings)
+    {
+        ViewportSettings = NewObject<UScenecapsViewportSettings>(GetTransientPackage());
+    }
+
     TSharedRef<SScenecapsEditorViewport> Viewport = SNew(SScenecapsEditorViewport)
         .Toolkit(SharedThis(this))
         .ViewportSettings(ViewportSettings);

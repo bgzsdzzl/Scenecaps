@@ -14,9 +14,9 @@ void SScenecapsEditorViewport::Construct(const FArguments& InArgs)
     ToolkitPtr = InArgs._Toolkit;
     ViewportSettings = InArgs._ViewportSettings;
 
-    if (!ViewportSettings.IsValid())
+    if (!ViewportSettings)
     {
-        ViewportSettings = MakeShared<UScenecapsViewportSettings>();
+        ViewportSettings = NewObject<UScenecapsViewportSettings>(GetTransientPackage());
     }
 
     SEditorViewport::Construct(SEditorViewport::FArguments());
@@ -43,7 +43,7 @@ TSharedRef<FEditorViewportClient> SScenecapsEditorViewport::MakeEditorViewportCl
         ToolkitPtr);
 
     // Apply settings to viewport client
-    if (ViewportClient.IsValid() && ViewportSettings.IsValid())
+    if (ViewportClient.IsValid() && ViewportSettings)
     {
         ViewportClient->EngineShowFlags.SetRendering(ViewportSettings->DefaultRenderMode == EScenecapsViewportRenderMode::Lit);
         ViewportClient->SetRealtime(ViewportSettings->bEnableRealtime);
@@ -52,13 +52,13 @@ TSharedRef<FEditorViewportClient> SScenecapsEditorViewport::MakeEditorViewportCl
     return ViewportClient.ToSharedRef();
 }
 
-void SScenecapsEditorViewport::ApplySettings(TSharedPtr<UScenecapsViewportSettings> InSettings)
+void SScenecapsEditorViewport::ApplySettings(TObjectPtr<UScenecapsViewportSettings> InSettings)
 {
     ViewportSettings = InSettings;
 
-    if (!ViewportSettings.IsValid())
+    if (!ViewportSettings)
     {
-        ViewportSettings = MakeShared<UScenecapsViewportSettings>();
+        ViewportSettings = NewObject<UScenecapsViewportSettings>(GetTransientPackage());
     }
 
     if (ViewportClient.IsValid())
@@ -84,7 +84,7 @@ void SScenecapsEditorViewport::AddCameraBookmark(const FScenecapsCameraBookmark&
 {
     CameraBookmarks.RemoveAll([&](const FScenecapsCameraBookmark& B) { return B.Name == Bookmark.Name; });
     CameraBookmarks.Add(Bookmark);
-    if (ViewportSettings.IsValid())
+    if (ViewportSettings)
     {
         ViewportSettings->CameraBookmarks = CameraBookmarks;
     }
@@ -93,7 +93,7 @@ void SScenecapsEditorViewport::AddCameraBookmark(const FScenecapsCameraBookmark&
 void SScenecapsEditorViewport::RemoveCameraBookmark(FName Name)
 {
     CameraBookmarks.RemoveAll([&](const FScenecapsCameraBookmark& B) { return B.Name == Name; });
-    if (ViewportSettings.IsValid())
+    if (ViewportSettings)
     {
         ViewportSettings->CameraBookmarks = CameraBookmarks;
     }

@@ -14,8 +14,8 @@ class SScenecapsEditorViewport : public SEditorViewport
 {
 public:
     SLATE_BEGIN_ARGS(SScenecapsEditorViewport) {}
-        SLATE_ARGUMENT(TSharedPtr<FScenecapsEditorToolkit>, Toolkit)
-        SLATE_ARGUMENT(TSharedPtr<UScenecapsViewportSettings>, ViewportSettings)
+        SLATE_ARGUMENT(TWeakPtr<FScenecapsEditorToolkit>, Toolkit)
+        SLATE_ARGUMENT(TObjectPtr<UScenecapsViewportSettings>, ViewportSettings)
     SLATE_END_ARGS()
 
     void Construct(const FArguments& InArgs);
@@ -25,10 +25,10 @@ public:
     TSharedPtr<FScenecapsEditorViewportClient> GetViewportClient() const { return ViewportClient; }
 
     // Apply settings to viewport
-    void ApplySettings(TSharedPtr<UScenecapsViewportSettings> InSettings);
+    void ApplySettings(TObjectPtr<UScenecapsViewportSettings> InSettings);
 
     // Get current settings
-    TSharedPtr<UScenecapsViewportSettings> GetSettings() const { return ViewportSettings; }
+    TObjectPtr<UScenecapsViewportSettings> GetSettings() const { return ViewportSettings; }
 
     // Camera bookmarks
     void AddCameraBookmark(const FScenecapsCameraBookmark& Bookmark);
@@ -48,7 +48,7 @@ public:
 private:
     TWeakPtr<FScenecapsEditorToolkit> ToolkitPtr;
     TSharedPtr<FScenecapsEditorViewportClient> ViewportClient;
-    TSharedPtr<UScenecapsViewportSettings> ViewportSettings;
+    TObjectPtr<UScenecapsViewportSettings> ViewportSettings;
     TArray<FScenecapsCameraBookmark> CameraBookmarks;
     TArray<FScenecapsViewportToolbarButton> ToolbarButtons;
 };
