@@ -2,9 +2,6 @@
 
 #include "ScenecapsEditorViewportClient.h"
 #include "ScenecapsEditorToolkit.h"
-#include "PrimitiveDrawInterface.h"
-#include "InputCoreTypes.h"
-#include "Engine/Engine.h"
 #include "EditorModeManager.h"
 
 FScenecapsEditorViewportClient::FScenecapsEditorViewportClient(
@@ -12,9 +9,22 @@ FScenecapsEditorViewportClient::FScenecapsEditorViewportClient(
     FPreviewScene* InPreviewScene,
     const TSharedRef<SEditorViewport>& InViewport,
     const TWeakPtr<FScenecapsEditorToolkit>& InToolkit)
-    : FEditorViewportClient(InModeTools, InPreviewScene, InViewport)
+    : FEditorViewportClient(nullptr, InPreviewScene, InViewport)
     , ToolkitPtr(InToolkit)
 {
+    // 像关卡编辑器一样初始化：开启网格、实时渲染、黑色背景、相机位置
+    EngineShowFlags.SetGrid(true);
+    SetRealtime(true);
+    
+    // 设置相机位置：Z=500 俯视，网格在 Z=0 可见
+    SetViewLocation(FVector(0.0f, 0.0f, 500.0f));
+    SetViewRotation(FRotator(-90.0f, 0.0f, 0.0f));
+    
+    // 像关卡编辑器一样设置视图模式和显示标志
+    EngineShowFlags.SetGrid(true);
+    SetRealtime(true);
+    EngineShowFlags.SetCompositeEditorPrimitives(true);
+    EngineShowFlags.SetSelectionOutline(true);
 }
 
 void FScenecapsEditorViewportClient::Tick(float DeltaSeconds)
@@ -24,7 +34,7 @@ void FScenecapsEditorViewportClient::Tick(float DeltaSeconds)
 
 FLinearColor FScenecapsEditorViewportClient::GetBackgroundColor() const
 {
-    return FEditorViewportClient::GetBackgroundColor();
+    return FLinearColor(0.0f, 0.0f, 0.0f, 1.0f); // 黑色背景
 }
 
 bool FScenecapsEditorViewportClient::InputKey(const FInputKeyEventArgs& EventArgs)

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "SEditorViewport.h"
+#include "LevelEditorViewport.h"
 #include "ScenecapsViewportConfig.h"
 
 class FScenecapsEditorToolkit;

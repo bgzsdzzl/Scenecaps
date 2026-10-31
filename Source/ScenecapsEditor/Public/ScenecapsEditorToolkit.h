@@ -38,8 +38,7 @@ public:
     TSharedPtr<FScenecapsEditorAssetProxy> GetAssetProxy() const { return AssetProxy; }
     UObject* GetEditingAssetObject() const { return AssetProxy.IsValid() ? AssetProxy->GetAssetObject() : nullptr; }
 
-    TWeakPtr<SScenecapsEditorViewport> GetViewportWidget() const { return ViewportWidget; }
-    TObjectPtr<UScenecapsViewportSettings> GetViewportSettings() const { return ViewportSettings; }
+TWeakPtr<SScenecapsEditorViewport> GetViewportWidget() const { return ViewportWidget; }
 
     FName GetPreviewVariant() const { return PreviewVariant; }
     void  SetPreviewVariant(FName InVariant);
@@ -102,11 +101,9 @@ private:
     TSharedPtr<FStructOnScope> BatchDetailsScope;
     TArray<FGuid> DetailsEntryIds;
 
-    FVector CachedEditorViewLocation = FVector::ZeroVector;
+FVector CachedEditorViewLocation = FVector::ZeroVector;
     FRotator CachedEditorViewRotation = FRotator::ZeroRotator;
     bool bEditorViewDirty = false;
-
-    TObjectPtr<UScenecapsViewportSettings> ViewportSettings;
 
     static const FName ViewportTabId;
     static const FName OutlinerTabId;

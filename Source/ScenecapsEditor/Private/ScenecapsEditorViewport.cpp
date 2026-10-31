@@ -3,6 +3,7 @@
 #include "ScenecapsEditorViewport.h"
 #include "ScenecapsEditorViewportClient.h"
 #include "ScenecapsEditorToolkit.h"
+#include "LevelEditorViewport.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Framework/Application/SlateApplication.h"
@@ -32,17 +33,6 @@ TSharedRef<FEditorViewportClient> SScenecapsEditorViewport::MakeEditorViewportCl
         PreviewScene,
         SharedThis(this),
         ToolkitPtr);
-
-    // Apply default viewport settings: black background, grid enabled, camera above grid
-    if (ViewportClient.IsValid())
-    {
-        ViewportClient->EngineShowFlags.SetGrid(true);
-        ViewportClient->SetRealtime(true);
-        
-        // Set camera above grid (Z > 0) looking down so grid at Z=0 is visible
-        ViewportClient->SetViewLocation(FVector(0.0f, 0.0f, 500.0f));
-        ViewportClient->SetViewRotation(FRotator(-90.0f, 0.0f, 0.0f));
-    }
 
     return ViewportClient.ToSharedRef();
 }
