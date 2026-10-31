@@ -39,6 +39,12 @@ struct SCENECAPS_API FScenecapsSpawnContext
 
     /** 材质覆盖槽位。-1 = 全部槽位。 */
     int32 MaterialSlotIndex = 0;
+
+    // ---- 新增：自定义参数（传递给 Handler/Blueprint）----
+    TMap<FName, float> FloatParams;
+    TMap<FName, FVector> VectorParams;
+    TMap<FName, FLinearColor> ColorParams;
+    TMap<FName, bool> BoolParams;
 };
 
 class SCENECAPS_API IScenecapsEntryHandler

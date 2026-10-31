@@ -19,3 +19,21 @@ Saved/
 # OS
 Thumbs.db
 desktop.ini
+
+# Build artifacts
+*.dll
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.obj
+
+# Large binary files
+*.uasset
+*.umap
+*.upk
+*.pak
+*.sig
+
+# Rider
+.idea/

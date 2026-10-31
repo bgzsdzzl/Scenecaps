@@ -236,7 +236,11 @@ AActor* FScenecapsMaterialEntryHandler::SpawnActor(
     }
 
     UStaticMesh* PreviewMesh = LoadObject<UStaticMesh>(
-        nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+        nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+    if (!PreviewMesh)
+    {
+        PreviewMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+    }
     if (!PreviewMesh) return nullptr;
 
     FActorSpawnParameters Params;

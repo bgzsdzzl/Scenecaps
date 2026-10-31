@@ -5,10 +5,13 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "ScenecapsTypes.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "ScenecapsAsset.generated.h"
 
 class AActor;
 class UWorld;
+class UScenecapsModifierManager;
 
 UCLASS(BlueprintType, meta = (DisplayName = "Scene Collection"))
 class SCENECAPS_API UScenecapsAsset : public UPrimaryDataAsset
@@ -38,6 +41,29 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Scenecaps|Variants")
 	FScenecapsEntry ApplyVariantToEntry(const FScenecapsEntry& BaseEntry, FName VariantName) const;
 
+	// ---- 新增：变体插值/过渡 ----
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Scenecaps|Variants")
+	FScenecapsInterpolatedEntry InterpolateEntry(
+		const FScenecapsEntry& BaseEntry,
+		FName FromVariant,
+		FName ToVariant,
+		float Alpha) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Scenecaps|Variants")
+	TArray<FScenecapsInterpolatedEntry> InterpolateAllEntries(
+		FName FromVariant,
+		FName ToVariant,
+		float Alpha) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Scenecaps|Variants")
+	FScenecapsVariantTransition BeginTransition(
+		FName FromVariant,
+		FName ToVariant,
+		float Duration,
+		EScenecapsInterpolationEase EaseType = EScenecapsInterpolationEase::CubicInOut,
+		bool bLoop = false,
+		bool bPingPong = false) const;
+
 	const FScenecapsVariant* FindVariant(FName VariantName) const;
 	const FScenecapsEntryOverride* FindOverride(const FScenecapsVariant& Variant, FGuid EntryId) const;
 
@@ -66,6 +92,20 @@ public:
 	FRotator EditorViewRotation = FRotator::ZeroRotator;
 #endif
 
+	// ----- Modifiers -----
+
+	UPROPERTY(EditAnywhere, Instanced, Category = "Scenecaps|Modifiers")
+	TObjectPtr<UScenecapsModifierManager> ModifierManager;
+
+	UFUNCTION(BlueprintCallable, Category = "Scenecaps|Modifiers")
+	void ApplyModifiers(EScenecapsModifierPhase Phase, FName VariantName = NAME_None, FGuid EntryId = FGuid());
+
+	UFUNCTION(BlueprintCallable, Category = "Scenecaps|Modifiers")
+	void ApplyModifiersToActor(AActor* Actor, FName VariantName = NAME_None);
+
+	UFUNCTION(BlueprintCallable, Category = "Scenecaps|Modifiers")
+	UScenecapsModifierManager* GetOrCreateModifierManager();
+
 	// ----- Spawn -----
 
 	UFUNCTION(BlueprintCallable, Category = "Scenecaps",
@@ -82,6 +122,27 @@ public:
 		bool bIncludeHidden,
 		FName VariantName,
 		TMap<FGuid, AActor*>& OutEntryToActor);
+
+	// ---- 新增：程序化生成 ----
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Scenecaps|Procedural")
+	TArray<FTransform> GenerateProceduralTransforms(
+		const FScenecapsEntry& Entry,
+		const FTransform& WorldTransform,
+		FName VariantName = NAME_None) const;
+
+	// ---- 新增：ISM/HISM 批量生成 ----
+	UFUNCTION(BlueprintCallable, Category = "Scenecaps|ISM")
+	UInstancedStaticMeshComponent* SpawnCollectionAsISM(
+		UObject* WorldContextObject,
+		const FTransform& WorldTransform,
+		FName VariantName = NAME_None);
+
+	UFUNCTION(BlueprintCallable, Category = "Scenecaps|ISM")
+	UHierarchicalInstancedStaticMeshComponent* SpawnCollectionAsHISM(
+		UObject* WorldContextObject,
+		const FTransform& WorldTransform,
+		FName VariantName = NAME_None, int32 NumLODs = 3,
+		float LODScreenSize = 0.5f);
 
 	virtual void PostLoad() override;
 };

@@ -4,8 +4,6 @@
 #include "ScenecapsEntryRegistry.h"
 #include "ScenecapsAsset.h"
 #include "ScenecapsActor.h"
-#include "ScenecapsStaticAsset.h"
-#include "ScenecapsStaticActor.h"
 
 #include "Editor.h"
 #include "EngineUtils.h"
@@ -110,120 +108,10 @@ void FScenecapsEditorCommands::GatherFromActors(UScenecapsAsset* Asset, const TA
 }
 
 // ================================================================
-// Static
+// Binary Export/Import
 // ================================================================
 
-void FScenecapsEditorCommands::PlaceStaticIntoCurrentLevel(UScenecapsStaticAsset* Asset)
-{
-    if (!GEditor || !Asset) return;
-    UWorld* World = GEditor->GetEditorWorldContext().World();
-    if (!World) return;
-
-    const FScopedTransaction Transaction(FText::FromString(TEXT("Place Static Scene Collection")));
-    FActorSpawnParameters Params;
-    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    Params.ObjectFlags |= RF_Transactional;
-
-    if (AScenecapsStaticActor* Container = World->SpawnActor<AScenecapsStaticActor>(
-        AScenecapsStaticActor::StaticClass(), FTransform::Identity, Params))
-    {
-        Container->CollectionAsset = Asset;
-        Container->Rebuild();
-    }
-}
-
-void FScenecapsEditorCommands::GatherStaticFromSelection(UScenecapsStaticAsset* Asset)
-{
-    if (!GEditor || !Asset) return;
-    UWorld* World = GEditor->GetEditorWorldContext().World();
-    if (!World) return;
-
-    TArray<AActor*> Selected;
-    if (USelection* Selection = GEditor->GetSelectedActors())
-    {
-        Selection->GetSelectedObjects<AActor>(Selected);
-    }
-    if (Selected.Num() == 0) return;
-
-    const FScopedTransaction Transaction(FText::FromString(TEXT("Gather Static Scene Collection")));
-    Asset->Modify();
-
-    TSet<AActor*> SelectedSet(Selected);
-    TArray<AActor*> Roots;
-    for (AActor* A : Selected)
-    {
-        bool bIsRoot = true;
-        for (AActor* P = A->GetAttachParentActor(); P; P = P->GetAttachParentActor())
-        {
-            if (SelectedSet.Contains(P)) { bIsRoot = false; break; }
-        }
-        if (bIsRoot) Roots.Add(A);
-    }
-
-    Asset->Entries.Reset();
-
-    TFunction<void(AActor*, const FGuid&, const FTransform&)> Recurse =
-        [&](AActor* Actor, const FGuid& ParentId, const FTransform& ParentWorld)
-        {
-            FScenecapsBakedEntry Entry;
-            UScenecapsStaticAsset::BakeActor(Actor, Entry);
-            Entry.ParentId = ParentId;
-            Entry.RelativeTransform = Actor->GetActorTransform().GetRelativeTransform(ParentWorld);
-
-            const FGuid MyId = Entry.EntryId;
-            Asset->Entries.Add(MoveTemp(Entry));
-
-            TArray<AActor*> Children;
-            Actor->GetAttachedActors(Children);
-            for (AActor* Child : Children)
-            {
-                if (SelectedSet.Contains(Child))
-                    Recurse(Child, MyId, Actor->GetActorTransform());
-            }
-        };
-
-    for (AActor* Root : Roots)
-        Recurse(Root, Asset->RootId, FTransform::Identity);
-
-    Asset->MarkPackageDirty();
-}
-
-UScenecapsStaticAsset* FScenecapsEditorCommands::ConvertToStatic(UScenecapsAsset* SourceAsset)
-{
-    if (!GEditor || !SourceAsset) return nullptr;
-    UWorld* World = GEditor->GetEditorWorldContext().World();
-    if (!World) return nullptr;
-
-    IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
-
-    const FString SrcPath = SourceAsset->GetOutermost()->GetName();
-    const FString SrcName = SourceAsset->GetName();
-    const FString PackagePath = FPackageName::GetLongPackagePath(SrcPath);
-    const FString BaseName = SrcName + TEXT("_Static");
-
-    FString NewName = BaseName;
-    FString NewPackageName = PackagePath / NewName;
-    int32 Suffix = 1;
-    while (FindObject<UObject>(nullptr, *NewPackageName) != nullptr ||
-        FPackageName::DoesPackageExist(NewPackageName))
-    {
-        NewName = FString::Printf(TEXT("%s_%d"), *BaseName, Suffix++);
-        NewPackageName = PackagePath / NewName;
-    }
-
-    const FScopedTransaction Transaction(FText::FromString(TEXT("Convert to Static Scenecaps")));
-
-    UObject* Created = AssetTools.CreateAsset(NewName, PackagePath, UScenecapsStaticAsset::StaticClass(), nullptr);
-    UScenecapsStaticAsset* NewAsset = Cast<UScenecapsStaticAsset>(Created);
-    if (!NewAsset) return nullptr;
-
-    UScenecapsStaticAsset::BakeFromSceneAsset(SourceAsset, NewAsset, World);
-    FAssetRegistryModule::AssetCreated(NewAsset);
-    NewAsset->MarkPackageDirty();
-    return NewAsset;
-}
-
-bool FScenecapsEditorCommands::ExportToCustomBinary(UScenecapsStaticAsset* Asset)
+bool FScenecapsEditorCommands::ExportToCustomBinary(UScenecapsAsset* Asset)
 {
     if (!Asset || !GEditor) return false;
 
@@ -285,9 +173,9 @@ bool FScenecapsEditorCommands::ExportToCustomBinary(UScenecapsStaticAsset* Asset
         }
     };
 
-    for (const FScenecapsBakedEntry& E : Asset->Entries)
+    for (const FScenecapsEntry& E : Asset->Entries)
     {
-        FScenecapsBakedEntry Entry = E;
+        FScenecapsEntry Entry = E;
 
         FileWriter->Serialize(&Entry.EntryId, sizeof(Entry.EntryId));
         FileWriter->Serialize(&Entry.ParentId, sizeof(Entry.ParentId));
@@ -300,7 +188,16 @@ bool FScenecapsEditorCommands::ExportToCustomBinary(UScenecapsStaticAsset* Asset
         WriteString(Entry.DisplayName);
         FileWriter->Serialize(&Entry.RelativeTransform, sizeof(Entry.RelativeTransform));
 
-        UClass* Cls = Entry.ActorClass.Get();
+        UClass* Cls = nullptr;
+        if (Entry.Asset.IsPending())
+            Entry.Asset.LoadSynchronous();
+        if (UObject* Obj = Entry.Asset.Get())
+        {
+            if (UClass* C = Cast<UClass>(Obj))
+                Cls = C;
+            else if (UBlueprint* BP = Cast<UBlueprint>(Obj))
+                Cls = BP->GeneratedClass;
+        }
         FString ClassPath = Cls ? FSoftObjectPath(Cls).ToString() : FString();
         WriteString(ClassPath);
 
@@ -308,14 +205,6 @@ bool FScenecapsEditorCommands::ExportToCustomBinary(UScenecapsStaticAsset* Asset
         WriteString(MatPath);
 
         FileWriter->Serialize(&Entry.MaterialSlotIndex, sizeof(Entry.MaterialSlotIndex));
-
-        const TArray<uint8>& Props = Entry.SerializedActorProperties;
-        int32 PropsNum = Props.Num();
-        FileWriter->Serialize(&PropsNum, sizeof(PropsNum));
-        if (PropsNum > 0)
-        {
-            FileWriter->Serialize((void*)Props.GetData(), PropsNum);
-        }
 
         FString DLPath = Entry.DataLayer.IsNull() ? FString() : Entry.DataLayer.ToSoftObjectPath().ToString();
         WriteString(DLPath);
@@ -330,21 +219,17 @@ bool FScenecapsEditorCommands::ExportToCustomBinary(UScenecapsStaticAsset* Asset
 
     if (bSuccess)
     {
-        UE_LOG(LogScenecaps, Log, TEXT("[Scenecaps] Exported static asset '%s' to custom binary: %s"), *Asset->GetName(), *OutFilename);
+        UE_LOG(LogScenecaps, Log, TEXT("[Scenecaps] Exported asset '%s' to custom binary: %s"), *Asset->GetName(), *OutFilename);
     }
     else
     {
         UE_LOG(LogScenecaps, Error, TEXT("[Scenecaps] Failed to write custom binary: %s"), *OutFilename);
     }
 
-return bSuccess;
+    return bSuccess;
 }
 
-// PCG 导出暂时禁用
-
-// PCG 导入暂时禁用
-
-bool FScenecapsEditorCommands::ImportFromCustomBinary(UScenecapsStaticAsset* Asset)
+bool FScenecapsEditorCommands::ImportFromCustomBinary(UScenecapsAsset* Asset)
 {
     if (!Asset || !GEditor) return false;
 
@@ -365,7 +250,7 @@ bool FScenecapsEditorCommands::ImportFromCustomBinary(UScenecapsStaticAsset* Ass
     TArray<FString> OutFilenames;
     if (!DesktopPlatform->OpenFileDialog(
         ParentWindowHandle,
-        FString(TEXT("Import Scenecaps Static Asset from Custom Binary")),
+        FString(TEXT("Import Scenecaps Asset from Custom Binary")),
         DefaultPath,
         FString(),
         FileTypes,
@@ -426,12 +311,12 @@ bool FScenecapsEditorCommands::ImportFromCustomBinary(UScenecapsStaticAsset* Ass
     int32 Count = 0;
     FileReader->Serialize(&Count, sizeof(Count));
 
-    TArray<FScenecapsBakedEntry> NewEntries;
+    TArray<FScenecapsEntry> NewEntries;
     NewEntries.Reserve(Count);
 
     for (int32 i = 0; i < Count; ++i)
     {
-        FScenecapsBakedEntry Entry;
+        FScenecapsEntry Entry;
 
         FileReader->Serialize(&Entry.EntryId, sizeof(Entry.EntryId));
         FileReader->Serialize(&Entry.ParentId, sizeof(Entry.ParentId));
@@ -448,7 +333,9 @@ bool FScenecapsEditorCommands::ImportFromCustomBinary(UScenecapsStaticAsset* Ass
         ReadString(ClassPath);
         if (!ClassPath.IsEmpty())
         {
-            Entry.ActorClass = LoadObject<UClass>(nullptr, *ClassPath);
+            UClass* Cls = LoadObject<UClass>(nullptr, *ClassPath);
+            if (Cls)
+                Entry.Asset = Cls;
         }
 
         FString MatPath;
@@ -459,14 +346,6 @@ bool FScenecapsEditorCommands::ImportFromCustomBinary(UScenecapsStaticAsset* Ass
         }
 
         FileReader->Serialize(&Entry.MaterialSlotIndex, sizeof(Entry.MaterialSlotIndex));
-
-        int32 PropsNum = 0;
-        FileReader->Serialize(&PropsNum, sizeof(PropsNum));
-        if (PropsNum > 0)
-        {
-            Entry.SerializedActorProperties.AddUninitialized(PropsNum);
-            FileReader->Serialize(Entry.SerializedActorProperties.GetData(), PropsNum);
-        }
 
         FString DLPath;
         ReadString(DLPath);
@@ -493,7 +372,7 @@ bool FScenecapsEditorCommands::ImportFromCustomBinary(UScenecapsStaticAsset* Ass
         Asset->RootId = RootId;
         Asset->Entries = MoveTemp(NewEntries);
         Asset->MarkPackageDirty();
-        UE_LOG(LogScenecaps, Log, TEXT("[Scenecaps] Imported static asset '%s' from custom binary: %s (%d entries)"), *Asset->GetName(), *InFilename, Asset->Entries.Num());
+        UE_LOG(LogScenecaps, Log, TEXT("[Scenecaps] Imported asset '%s' from custom binary: %s (%d entries)"), *Asset->GetName(), *InFilename, Asset->Entries.Num());
     }
     else
     {

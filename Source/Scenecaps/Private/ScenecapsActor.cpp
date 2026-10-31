@@ -1,10 +1,10 @@
-// Plugins/Scenecaps/Source/Scenecaps/Private/ScenecapsActor.cpp
-
 #include "ScenecapsActor.h"
 
 #include "ScenecapsAsset.h"
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
+#include "ScenecapsModifierManager.h"
+#include "ScenecapsModifierManager.h"
 #include "GameFramework/Actor.h"
 #include "WorldPartition/DataLayer/DataLayerAsset.h"
 #include "WorldPartition/DataLayer/DataLayerInstance.h"
@@ -66,7 +66,6 @@ void AScenecapsActor::Rebuild()
 
     Clear();
     EnsureDataLayerCached();
-
     if (ShouldDeferRebuild()) return;
 
     UScenecapsAsset* Asset = CollectionAsset.LoadSynchronous();
@@ -114,38 +113,26 @@ void AScenecapsActor::Rebuild()
 
 void AScenecapsActor::Clear()
 {
-    UDataLayerAsset* LayerToRemove = CachedDataLayerAsset;
-    if (!LayerToRemove && !TargetDataLayer.IsNull())
-    {
-        LayerToRemove = TargetDataLayer.LoadSynchronous();
-    }
-
-    if (LayerToRemove)
-    {
-        for (TObjectPtr<AActor>& Ptr : SpawnedActors)
-        {
-            if (AActor* Actor = Ptr.Get())
-            {
-                if (IsValid(Actor)) RemoveDataLayerFromActor(Actor, LayerToRemove);
-            }
-        }
-    }
-
     for (TObjectPtr<AActor>& Ptr : SpawnedActors)
     {
         if (AActor* Actor = Ptr.Get())
         {
-            if (IsValid(Actor)) Actor->Destroy();
+            if (IsValid(Actor))
+            {
+                UDataLayerAsset* LayerToRemove = CachedDataLayerAsset;
+                if (!LayerToRemove && !TargetDataLayer.IsNull())
+                {
+                    LayerToRemove = TargetDataLayer.LoadSynchronous();
+                }
+                if (LayerToRemove)
+                {
+                    RemoveDataLayerFromActor(Actor, LayerToRemove);
+                }
+                Actor->Destroy();
+            }
         }
     }
     SpawnedActors.Empty();
-}
-
-void AScenecapsActor::SetActiveVariant(FName InVariant)
-{
-    if (ActiveVariant == InVariant) return;
-    ActiveVariant = InVariant;
-    Rebuild();
 }
 
 // ---------- AActor lifecycle ----------
@@ -252,21 +239,22 @@ bool AScenecapsActor::ShouldDeferRebuild() const
     return !IsTargetDataLayerActive();
 }
 
+
+
 FText AScenecapsActor::GetDataLayerStatusText() const
 {
     if (TargetDataLayer.IsNull()) return FText::FromString(TEXT("N/A (no Data Layer)"));
     UWorld* World = GetWorld();
     if (!World) return FText::FromString(TEXT("No World"));
-    UDataLayerManager* Manager = UDataLayerManager::GetDataLayerManager(World);
-    if (!Manager) return FText::FromString(TEXT("No DataLayerManager"));
+    UDataLayerManager* M = UDataLayerManager::GetDataLayerManager(World);
+    if (!M) return FText::FromString(TEXT("No DataLayerManager"));
 
     UDataLayerAsset* Asset = TargetDataLayer.LoadSynchronous();
     if (!Asset) return FText::FromString(TEXT("Asset missing"));
-
-    const UDataLayerInstance* Instance = Manager->GetDataLayerInstanceFromAsset(Asset);
+    const UDataLayerInstance* Instance = M->GetDataLayerInstanceFromAsset(Asset);
     if (!Instance) return FText::FromString(TEXT("Instance not registered"));
 
-    switch (Manager->GetDataLayerInstanceRuntimeState(Instance))
+    switch (M->GetDataLayerInstanceRuntimeState(Instance))
     {
     case EDataLayerRuntimeState::Activated: return FText::FromString(TEXT("Activated"));
     case EDataLayerRuntimeState::Loaded:    return FText::FromString(TEXT("Loaded"));
@@ -274,3 +262,128 @@ FText AScenecapsActor::GetDataLayerStatusText() const
     default:                                return FText::FromString(TEXT("Unknown"));
     }
 }
+
+
+
+// ---------- Runtime Blueprint API ----------
+
+UScenecapsAsset* AScenecapsActor::GetCollectionAsset() const
+{
+    return CollectionAsset.LoadSynchronous();
+}
+
+FName AScenecapsActor::GetActiveVariant() const
+{
+    return ActiveVariant;
+}
+
+TArray<FName> AScenecapsActor::GetVariantNames() const
+{
+    TArray<FName> Names;
+    if (!CollectionAsset.IsNull())
+    {
+        if (UScenecapsAsset* Asset = CollectionAsset.LoadSynchronous())
+            Names = Asset->GetVariantNames();
+    }
+    return Names;
+}
+
+void AScenecapsActor::SetCollectionAsset(UScenecapsAsset* InAsset, bool bRebuildImmediately)
+{
+    if (CollectionAsset.Get() == InAsset) return;
+    CollectionAsset = InAsset;
+    if (bRebuildImmediately) Rebuild();
+}
+
+void AScenecapsActor::SetActiveVariant(FName InVariant, bool bRebuildImmediately)
+{
+    if (ActiveVariant == InVariant) return;
+    ActiveVariant = InVariant;
+    if (bRebuildImmediately) Rebuild();
+}
+
+UDataLayerAsset* AScenecapsActor::GetTargetDataLayer() const
+{
+    return TargetDataLayer.LoadSynchronous();
+}
+
+void AScenecapsActor::SetTargetDataLayer(UDataLayerAsset* InDataLayer, bool bApplyImmediately)
+{
+    if (TargetDataLayer.Get() == InDataLayer) return;
+    TargetDataLayer = InDataLayer;
+    CachedDataLayerAsset = InDataLayer;
+    if (bApplyImmediately) Rebuild();
+}
+
+void AScenecapsActor::SetDataLayerActive(bool bActive)
+{
+    if (!TargetDataLayer.IsNull())
+    {
+        UWorld* World = GetWorld();
+        if (UDataLayerManager* Manager = UDataLayerManager::GetDataLayerManager(GetWorld()))
+        {
+            if (UDataLayerAsset* Asset = TargetDataLayer.LoadSynchronous())
+            {
+                if (const UDataLayerInstance* Instance = Manager->GetDataLayerInstanceFromAsset(TargetDataLayer.LoadSynchronous()))
+                {
+                    Manager->SetDataLayerInstanceRuntimeState(const_cast<UDataLayerInstance*>(Instance), bActive ? EDataLayerRuntimeState::Activated : EDataLayerRuntimeState::Unloaded);
+                }
+            }
+        }
+    }
+}
+
+TArray<AActor*> AScenecapsActor::GetSpawnedActorArray() const
+{
+    TArray<AActor*> Result;
+    Result.Reserve(SpawnedActors.Num());
+    for (const TObjectPtr<AActor>& Ptr : SpawnedActors)
+    {
+        if (AActor* Actor = Ptr.Get())
+            Result.Add(Actor);
+    }
+    return Result;
+}
+
+TArray<AActor*> AScenecapsActor::FindSpawnedActorsByClass(TSubclassOf<AActor> ActorClass) const
+{
+    TArray<AActor*> Result;
+    for (const TObjectPtr<AActor>& Ptr : SpawnedActors)
+    {
+        if (AActor* Actor = Ptr.Get())
+        {
+            if (Actor->IsA(ActorClass))
+                Result.Add(Actor);
+        }
+    }
+    return Result;
+}
+
+// ---- Modifier System ----
+
+UScenecapsModifierManager* AScenecapsActor::GetOrCreateModifierManager()
+{
+    if (!ModifierManager)
+    {
+        ModifierManager = NewObject<UScenecapsModifierManager>(this);
+    }
+    return ModifierManager;
+}
+
+void AScenecapsActor::ApplyModifiers(EScenecapsModifierPhase Phase, FName VariantName, FGuid EntryId)
+{
+    if (UScenecapsModifierManager* Mgr = GetOrCreateModifierManager())
+    {
+        Mgr->ExecuteModifiers(CollectionAsset.Get(), Phase, VariantName, EntryId, this);
+    }
+}
+
+void AScenecapsActor::ApplyModifiersToActor(AActor* Actor, FName VariantName)
+{
+    if (!Actor) return;
+    if (UScenecapsModifierManager* Mgr = GetOrCreateModifierManager())
+    {
+        Mgr->ExecuteModifiersOnActor(Actor, CollectionAsset.Get(), VariantName);
+    }
+}
+

@@ -1,12 +1,12 @@
+// Plugins/Scenecaps/Source/ScenecapsEditor/Public/ScenecapsEditorAssetProxy.h
+
 #pragma once
 
 #include "CoreMinimal.h"
 #include "ScenecapsTypes.h"
-#include "ScenecapsStaticTypes.h"
 #include "ScenecapsEditorAssetProxy.generated.h"
 
 class UScenecapsAsset;
-class UScenecapsStaticAsset;
 class UWorld;
 class AActor;
 class UDataLayerAsset;
@@ -46,7 +46,6 @@ struct FScenecapsEditorEntryView
 
     TSoftObjectPtr<UObject> IconAsset;
     TSoftClassPtr<AActor>   IconClass;
-    bool                    bBaked = false;
 };
 
 class SCENECAPSEDITOR_API FScenecapsEditorAssetProxy

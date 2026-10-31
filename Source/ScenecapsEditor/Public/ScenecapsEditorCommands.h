@@ -4,7 +4,6 @@
 #include "CoreMinimal.h"
 
 class UScenecapsAsset;
-class UScenecapsStaticAsset;
 class AActor;
 
 class FScenecapsEditorCommands
@@ -14,16 +13,7 @@ public:
     static void PlaceIntoCurrentLevel(UScenecapsAsset* Asset);
     static void GatherFromActors(UScenecapsAsset* Asset, const TArray<AActor*>& Actors);
 
-    // Static 版
-    static void PlaceStaticIntoCurrentLevel(UScenecapsStaticAsset* Asset);
-    static void GatherStaticFromSelection(UScenecapsStaticAsset* Asset);
-
-    // 引用 → 静态
-    static UScenecapsStaticAsset* ConvertToStatic(UScenecapsAsset* SourceAsset);
-
     // 自定义二进制导入/导出（.scnb）
-    static bool ExportToCustomBinary(UScenecapsStaticAsset* Asset);
-    static bool ImportFromCustomBinary(UScenecapsStaticAsset* Asset);
-
-    // PCG 互操作 (暂时禁用)
+    static bool ExportToCustomBinary(UScenecapsAsset* Asset);
+    static bool ImportFromCustomBinary(UScenecapsAsset* Asset);
 };

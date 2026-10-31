@@ -1,5 +1,3 @@
-// Plugins/Scenecaps/Source/Scenecaps/Scenecaps.Build.cs
-
 using UnrealBuildTool;
 
 public class Scenecaps : ModuleRules
@@ -8,12 +6,12 @@ public class Scenecaps : ModuleRules
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        PublicDependencyModuleNames.AddRange(new string[]
-        {
+        PublicDependencyModuleNames.AddRange(new string[] { 
             "Core",
             "CoreUObject",
-            "Engine"        // ← WorldPartition / DataLayer 的所有类型都在这里
-        });
+            "Engine",
+            "SlateCore", "Slate",
+            "Landscape" });
 
         PrivateDependencyModuleNames.AddRange(new string[] { "Json", "JsonUtilities", "Projects" });
 

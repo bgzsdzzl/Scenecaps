@@ -4,10 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "Engine/EngineTypes.h"
+#include "ScenecapsProceduralTypes.h"
 #include "ScenecapsTypes.generated.h"
 
 class UDataLayerAsset;
 class UMaterialInterface;
+class UTexture;
 
 /**
  * A single entry inside a scene collection.
@@ -72,6 +74,23 @@ struct SCENECAPS_API FScenecapsEntry
 
 	UPROPERTY(EditAnywhere, Category = "Scenecaps|World Partition")
 	TSoftObjectPtr<UDataLayerAsset> DataLayer;
+
+	// ---- 新增：自定义参数（可在变体中覆盖、插值）----
+	UPROPERTY(EditAnywhere, Category = "Scenecaps|Custom Params", meta = (DisplayName = "Float Params"))
+	TMap<FName, float> FloatParams;
+
+	UPROPERTY(EditAnywhere, Category = "Scenecaps|Custom Params", meta = (DisplayName = "Vector Params"))
+	TMap<FName, FVector> VectorParams;
+
+	UPROPERTY(EditAnywhere, Category = "Scenecaps|Custom Params", meta = (DisplayName = "Color Params"))
+	TMap<FName, FLinearColor> ColorParams;
+
+	UPROPERTY(EditAnywhere, Category = "Scenecaps|Custom Params", meta = (DisplayName = "Bool Params"))
+	TMap<FName, bool> BoolParams;
+
+	// ---- 新增：程序化生成参数 ----
+	UPROPERTY(EditAnywhere, Category = "Scenecaps|Procedural", meta = (ShowOnlyInnerProperties))
+	FScenecapsProceduralParams ProceduralParams;
 };
 
 // ================================================================
@@ -119,10 +138,44 @@ struct SCENECAPS_API FScenecapsEntryOverride
 	UPROPERTY(EditAnywhere, Category = "Material", meta = (EditCondition = "bOverrideMaterial"))
 	int32 MaterialSlotIndex = 0;
 
-	/** 至少有一个字段被覆盖时为 true（UI 用来显示“有效覆盖”）。 */
+	// ---- 新增：自定义参数覆盖 ----
+	UPROPERTY(EditAnywhere, Category = "Custom Params")
+	bool bOverrideFloatParams = false;
+
+	UPROPERTY(EditAnywhere, Category = "Custom Params", meta = (EditCondition = "bOverrideFloatParams"))
+	TMap<FName, float> FloatParams;
+
+	UPROPERTY(EditAnywhere, Category = "Custom Params")
+	bool bOverrideVectorParams = false;
+
+	UPROPERTY(EditAnywhere, Category = "Custom Params", meta = (EditCondition = "bOverrideVectorParams"))
+	TMap<FName, FVector> VectorParams;
+
+	UPROPERTY(EditAnywhere, Category = "Custom Params")
+	bool bOverrideColorParams = false;
+
+	UPROPERTY(EditAnywhere, Category = "Custom Params", meta = (EditCondition = "bOverrideColorParams"))
+	TMap<FName, FLinearColor> ColorParams;
+
+	UPROPERTY(EditAnywhere, Category = "Custom Params")
+	bool bOverrideBoolParams = false;
+
+	UPROPERTY(EditAnywhere, Category = "Custom Params", meta = (EditCondition = "bOverrideBoolParams"))
+	TMap<FName, bool> BoolParams;
+
+	// ---- 新增：程序化参数覆盖 ----
+	UPROPERTY(EditAnywhere, Category = "Procedural")
+	bool bOverrideProceduralParams = false;
+
+	UPROPERTY(EditAnywhere, Category = "Procedural", meta = (EditCondition = "bOverrideProceduralParams", ShowOnlyInnerProperties))
+	FScenecapsProceduralParams ProceduralParams;
+
+	/** 至少有一个字段被覆盖时为 true（UI 用来显示"有效覆盖"）。 */
 	bool HasAnyOverride() const
 	{
-		return bOverrideVisible || bOverrideTransform || bOverrideMaterial;
+		return bOverrideVisible || bOverrideTransform || bOverrideMaterial
+			|| bOverrideFloatParams || bOverrideVectorParams || bOverrideColorParams || bOverrideBoolParams
+			|| bOverrideProceduralParams;
 	}
 };
 
@@ -144,4 +197,124 @@ struct SCENECAPS_API FScenecapsVariant
 
 	UPROPERTY(EditAnywhere, Category = "Scenecaps", meta = (TitleProperty = "DisplayName"))
 	TArray<FScenecapsEntryOverride> Overrides;
+};
+
+// ================================================================
+// Variant Interpolation (Runtime)
+// ================================================================
+
+/** 插值缓动类型 */
+UENUM(BlueprintType)
+enum class EScenecapsInterpolationEase : uint8
+{
+	Linear,
+	QuadIn,
+	QuadOut,
+	QuadInOut,
+	CubicIn,
+	CubicOut,
+	CubicInOut,
+	SineIn,
+	SineOut,
+	SineInOut,
+	ExpoIn,
+	ExpoOut,
+	ExpoInOut
+};
+
+/** 变体过渡运行时状态 */
+USTRUCT(BlueprintType)
+struct SCENECAPS_API FScenecapsVariantTransition
+{
+	GENERATED_BODY()
+
+	/** 起始变体（NAME_None = Base） */
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps|Transition")
+	FName FromVariant = NAME_None;
+
+	/** 目标变体 */
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps|Transition")
+	FName ToVariant = NAME_None;
+
+	/** 总时长（秒） */
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps|Transition")
+	float Duration = 1.0f;
+
+	/** 已用时间 */
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps|Transition")
+	float ElapsedTime = 0.0f;
+
+	/** 缓动函数 */
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps|Transition")
+	EScenecapsInterpolationEase EaseType = EScenecapsInterpolationEase::CubicInOut;
+
+	/** 当前归一化进度 [0,1] */
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps|Transition")
+	float Alpha = 0.0f;
+
+	/** 是否正在过渡 */
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps|Transition")
+	bool bIsActive = false;
+
+	/** 是否循环 */
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps|Transition")
+	bool bLoop = false;
+
+	/** 是否反向播放（到达终点后自动反向） */
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps|Transition")
+	bool bPingPong = false;
+
+	/** 重置过渡 */
+	void Reset()
+	{
+		FromVariant = NAME_None;
+		ToVariant = NAME_None;
+		Duration = 1.0f;
+		ElapsedTime = 0.0f;
+		EaseType = EScenecapsInterpolationEase::CubicInOut;
+		Alpha = 0.0f;
+		bIsActive = false;
+		bLoop = false;
+		bPingPong = false;
+	}
+
+	/** 更新过渡，返回当前 Alpha；过渡结束返回 >=1 或 <=0 */
+	float Update(float DeltaTime);
+
+	/** 根据缓动类型计算 Alpha */
+	static float EaseAlpha(float InAlpha, EScenecapsInterpolationEase EaseType);
+};
+
+/** 插值后的条目结果（运行时生成，不存盘） */
+USTRUCT(BlueprintType)
+struct SCENECAPS_API FScenecapsInterpolatedEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps")
+	FGuid EntryId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps")
+	bool bVisible = true;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps")
+	FTransform RelativeTransform = FTransform::Identity;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps")
+	TSoftObjectPtr<UMaterialInterface> MaterialOverride;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps")
+	int32 MaterialSlotIndex = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps")
+	TMap<FName, float> FloatParams;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps")
+	TMap<FName, FVector> VectorParams;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps")
+	TMap<FName, FLinearColor> ColorParams;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Scenecaps")
+	TMap<FName, bool> BoolParams;
 };

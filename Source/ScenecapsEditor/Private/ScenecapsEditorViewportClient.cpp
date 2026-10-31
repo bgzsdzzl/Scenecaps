@@ -1,183 +1,259 @@
 // Plugins/Scenecaps/Source/ScenecapsEditor/Private/ScenecapsEditorViewportClient.cpp
+
 #include "ScenecapsEditorViewportClient.h"
 #include "ScenecapsEditorToolkit.h"
-#include "ScenecapsEditorAssetProxy.h"
-#include "Engine/World.h"
-#include "PreviewScene.h"
-#include "SceneView.h"
-#include "CollisionQueryParams.h"
-#include "Framework/Application/SlateApplication.h"
-#include "Editor.h"
-#include "DrawDebugHelpers.h"
+#include "ScenecapsViewportExtension.h"
+#include "PrimitiveDrawInterface.h"
+#include "InputCoreTypes.h"
+#include "Engine/Engine.h"
+#include "EditorModeManager.h"
 
 FScenecapsEditorViewportClient::FScenecapsEditorViewportClient(
+    FEditorModeTools* InModeTools,
     FPreviewScene* InPreviewScene,
     const TSharedRef<SEditorViewport>& InViewport,
-    const TSharedPtr<FScenecapsEditorToolkit>& InToolkit)
-    : FEditorViewportClient(nullptr, InPreviewScene, InViewport)
+    const TWeakPtr<FScenecapsEditorToolkit>& InToolkit)
+    : FEditorViewportClient(InModeTools, InPreviewScene, InViewport)
     , ToolkitPtr(InToolkit)
 {
-    SetViewMode(VMI_Lit);
-    DrawHelper.bDrawGrid = true;
-    DrawHelper.bDrawPivot = false;
-    DrawHelper.bDrawWorldBox = false;
-    DrawHelper.GridColorAxis = FColor(80, 80, 80);
-    DrawHelper.GridColorMajor = FColor(55, 55, 55);
-    DrawHelper.GridColorMinor = FColor(35, 35, 35);
-    SetRealtime(false);
-
-    bool bRestored = false;
-    if (TSharedPtr<FScenecapsEditorToolkit> Toolkit = ToolkitPtr.Pin())
+    // Default overlay configs
+    OverlayConfigs.Add(FScenecapsViewportOverlayConfig
     {
-        if (TSharedPtr<FScenecapsEditorAssetProxy> Proxy = Toolkit->GetAssetProxy())
-        {
-            FVector Loc; FRotator Rot;
-            if (Proxy->GetSavedEditorView(Loc, Rot))
-            {
-                SetViewLocation(Loc);
-                SetViewRotation(Rot);
-                bRestored = true;
-            }
-        }
-    }
-    if (!bRestored) FocusViewportOnBox(FBox(FVector(-100.f), FVector(100.f)));
+        .Type = EScenecapsViewportOverlayType::Grid,
+        .bEnabled = true,
+        .Color = FLinearColor::White,
+        .Scale = 1.0f
+    });
+
+    OverlayConfigs.Add(FScenecapsViewportOverlayConfig
+    {
+        .Type = EScenecapsViewportOverlayType::Axes,
+        .bEnabled = true,
+        .Color = FLinearColor::White,
+        .Scale = 1.0f
+    });
 }
 
 void FScenecapsEditorViewportClient::Tick(float DeltaSeconds)
 {
     FEditorViewportClient::Tick(DeltaSeconds);
-    if (TSharedPtr<FScenecapsEditorToolkit> Toolkit = ToolkitPtr.Pin())
-        Toolkit->UpdateCachedEditorView(GetViewLocation(), GetViewRotation());
 
-    // 选中条目后，在视口里画 XYZ 坐标轴箭头 + 包围盒块
-    if (SelectedActors.Num() > 0)
-    {
-        if (TSharedPtr<FScenecapsEditorToolkit> Toolkit = ToolkitPtr.Pin())
-            if (FPreviewScene* Scene = Toolkit->GetPreviewScene())
-                if (UWorld* World = Scene->GetWorld())
-                {
-                    const float AxisLength = 60.f;
-                    const float Thickness = 2.f;
-                    for (const TWeakObjectPtr<AActor>& ActorPtr : SelectedActors)
-                    {
-                        AActor* Actor = ActorPtr.Get();
-                        if (!Actor || !IsValid(Actor)) continue;
-
-                        const FVector Loc = Actor->GetActorLocation();
-                        const FRotator Rot = Actor->GetActorRotation();
-
-                        const FVector XDir = Rot.RotateVector(FVector::ForwardVector);
-                        const FVector YDir = Rot.RotateVector(FVector::RightVector);
-                        const FVector ZDir = Rot.RotateVector(FVector::UpVector);
-
-                        DrawDebugDirectionalArrow(World, Loc, Loc + XDir * AxisLength, 8.f, FColor::Red, false, 0.f, 0, Thickness);
-                        DrawDebugDirectionalArrow(World, Loc, Loc + YDir * AxisLength, 8.f, FColor::Green, false, 0.f, 0, Thickness);
-                        DrawDebugDirectionalArrow(World, Loc, Loc + ZDir * AxisLength, 8.f, FColor::Blue, false, 0.f, 0, Thickness);
-
-                        const FBox Box = Actor->GetComponentsBoundingBox(true);
-                        if (Box.IsValid)
-                        {
-                            DrawDebugBox(World, Box.GetCenter(), Box.GetExtent(), FColor::Yellow, false, 0.f, 0, 2.f);
-                        }
-                        else
-                        {
-                            DrawDebugBox(World, Loc, FVector(15.f), FColor::Yellow, false, 0.f, 0, 2.f);
-                        }
-                    }
-                }
-    }
+    // Tick extensions
+    TickExtensions(DeltaSeconds);
 }
-
-void FScenecapsEditorViewportClient::RequestRedraw() { Invalidate(); }
 
 FLinearColor FScenecapsEditorViewportClient::GetBackgroundColor() const
 {
-    return FLinearColor(0.035f, 0.035f, 0.035f, 1.0f);
-}
-
-void FScenecapsEditorViewportClient::SetSelectedActors(const TArray<AActor*>& InActors)
-{
-    SelectedActors.Empty();
-    for (AActor* A : InActors) SelectedActors.Add(A);
-    if (GEditor)
+    if (ToolkitPtr.IsValid())
     {
-        GEditor->SelectNone(false, true);
-        for (AActor* A : InActors) GEditor->SelectActor(A, true, true);
-        GEditor->NoteSelectionChange();
+        if (auto Toolkit = ToolkitPtr.Pin())
+        {
+            if (auto Settings = Toolkit->GetViewportSettings())
+            {
+                return Settings->BackgroundColor;
+            }
+        }
     }
-    Invalidate();
+    return FEditorViewportClient::GetBackgroundColor();
 }
 
 bool FScenecapsEditorViewportClient::InputKey(const FInputKeyEventArgs& EventArgs)
 {
-    const bool bHandled = FEditorViewportClient::InputKey(EventArgs);
+    // Try extensions first
+    if (HandleCustomInput(FInputEvent()))
+    {
+        return true;
+    }
 
-    if (EventArgs.Key == EKeys::LeftMouseButton && EventArgs.Event == IE_Pressed && EventArgs.Viewport)
-    {
-        const FModifierKeysState Mod = FSlateApplication::Get().GetModifierKeys();
-        if (!Mod.IsShiftDown() && !Mod.IsControlDown() && !Mod.IsAltDown())
-        {
-            if (TSharedPtr<FScenecapsEditorToolkit> Toolkit = ToolkitPtr.Pin())
-                if (FPreviewScene* Scene = Toolkit->GetPreviewScene())
-                    if (UWorld* World = Scene->GetWorld())
-                    {
-                        FSceneViewFamily::ConstructionValues CVS(EventArgs.Viewport, World->Scene, *GetEngineShowFlagsPublic());
-                        FSceneViewFamilyContext ViewFamily(CVS);
-                        FSceneView* View = CalcSceneView(&ViewFamily);
-                        if (View)
-                        {
-                            FIntPoint MousePos(0, 0);
-                            EventArgs.Viewport->GetMousePos(MousePos, true);
-                            FVector RayOrigin, RayDir;
-                            View->DeprojectFVector2D(FVector2D(MousePos), RayOrigin, RayDir);
-                            FHitResult Hit;
-                            FCollisionQueryParams QP(SCENE_QUERY_STAT(ScenecapsSelect), true);
-                            if (World->LineTraceSingleByChannel(Hit, RayOrigin,
-                                RayOrigin + RayDir * 100000.f, ECC_Visibility, QP))
-                            {
-                                SetSelectedActors({ Hit.GetActor() });
-                                Toolkit->HandleViewportActorSelected(Hit.GetActor());
-                            }
-                            else
-                            {
-                                SetSelectedActors({});
-                                Toolkit->ShowAssetDetails();
-                            }
-                        }
-                    }
-        }
-    }
-    else if (EventArgs.Key == EKeys::Delete && EventArgs.Event == IE_Pressed)
-    {
-        if (TSharedPtr<FScenecapsEditorToolkit> Toolkit = ToolkitPtr.Pin())
-            if (SelectedActors.Num() > 0)
-            {
-                Toolkit->DeleteSelectedViewportActors(SelectedActors);
-                SetSelectedActors({});
-                return true;
-            }
-    }
-    return bHandled;
+    return FEditorViewportClient::InputKey(EventArgs);
 }
 
 void FScenecapsEditorViewportClient::TrackingStarted(const struct FInputEventState& InInputState, bool bIsDragging, bool bNudge)
 {
     FEditorViewportClient::TrackingStarted(InInputState, bIsDragging, bNudge);
-    if (bIsDragging && SelectedActors.Num() > 0)
-        if (TSharedPtr<FScenecapsEditorToolkit> Toolkit = ToolkitPtr.Pin())
-        {
-            Toolkit->BeginTransaction();
-            bIsTransacting = true;
-        }
 }
 
 void FScenecapsEditorViewportClient::TrackingStopped()
 {
     FEditorViewportClient::TrackingStopped();
-    if (bIsTransacting)
+}
+
+void FScenecapsEditorViewportClient::RequestRedraw()
+{
+    Invalidate();
+}
+
+void FScenecapsEditorViewportClient::SetSelectedActors(const TArray<AActor*>& InActors)
+{
+    SelectedActors.Empty();
+    for (AActor* Actor : InActors)
     {
-        if (TSharedPtr<FScenecapsEditorToolkit> Toolkit = ToolkitPtr.Pin())
-            Toolkit->EndTransactionAndUpdateTransforms(SelectedActors);
-        bIsTransacting = false;
+        if (Actor)
+        {
+            SelectedActors.Add(Actor);
+        }
     }
+}
+
+void FScenecapsEditorViewportClient::DrawCustomOverlays(FPrimitiveDrawInterface* PDI)
+{
+    // Draw grid
+    for (const FScenecapsViewportOverlayConfig& Config : OverlayConfigs)
+    {
+        if (!Config.bEnabled) continue;
+
+        switch (Config.Type)
+        {
+        case EScenecapsViewportOverlayType::Grid:
+            if (Config.bEnabled)
+            {
+                DrawGrid(PDI, Config);
+            }
+            break;
+        case EScenecapsViewportOverlayType::Axes:
+            if (Config.bEnabled)
+            {
+                DrawAxes(PDI, Config);
+            }
+            break;
+        case EScenecapsViewportOverlayType::Bounds:
+            if (Config.bEnabled)
+            {
+                DrawBounds(PDI, Config);
+            }
+            break;
+        case EScenecapsViewportOverlayType::Pivot:
+            if (Config.bEnabled)
+            {
+                DrawPivot(PDI, Config);
+            }
+            break;
+        case EScenecapsViewportOverlayType::Custom:
+            if (Config.bEnabled)
+            {
+                DrawCustom(PDI, Config);
+            }
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+void FScenecapsEditorViewportClient::DrawGrid(FPrimitiveDrawInterface* PDI, const FScenecapsViewportOverlayConfig& Config)
+{
+    const float GridSize = 100.0f * Config.Scale;
+    const int32 NumLines = 20;
+    const FLinearColor GridColor = Config.Color;
+
+    for (int32 i = -NumLines; i <= NumLines; ++i)
+    {
+        float X = i * GridSize;
+        PDI->DrawLine(FVector(X, -NumLines * GridSize, 0), FVector(X, NumLines * GridSize, 0), GridColor, SDPG_World);
+        PDI->DrawLine(FVector(-NumLines * GridSize, X, 0), FVector(NumLines * GridSize, X, 0), GridColor, SDPG_World);
+    }
+}
+
+void FScenecapsEditorViewportClient::DrawAxes(FPrimitiveDrawInterface* PDI, const FScenecapsViewportOverlayConfig& Config)
+{
+    const float AxisLength = 100.0f * Config.Scale;
+    const FVector Origin = FVector::ZeroVector;
+
+    PDI->DrawLine(Origin, FVector(AxisLength, 0, 0), FLinearColor::Red, SDPG_World, 2.0f);
+    PDI->DrawLine(Origin, FVector(0, AxisLength, 0), FLinearColor::Green, SDPG_World, 2.0f);
+    PDI->DrawLine(Origin, FVector(0, 0, AxisLength), FLinearColor::Blue, SDPG_World, 2.0f);
+
+    // Labels
+    PDI->DrawPoint(FVector(AxisLength * 1.1f, 0, 0), FLinearColor::Red, 5.0f, SDPG_World);
+    PDI->DrawPoint(FVector(0, AxisLength * 1.1f, 0), FLinearColor::Green, 5.0f, SDPG_World);
+    PDI->DrawPoint(FVector(0, 0, AxisLength * 1.1f), FLinearColor::Blue, 5.0f, SDPG_World);
+}
+
+void FScenecapsEditorViewportClient::DrawBounds(FPrimitiveDrawInterface* PDI, const FScenecapsViewportOverlayConfig& Config)
+{
+    // Draw bounds for selected actors
+    for (const TWeakObjectPtr<AActor>& ActorPtr : SelectedActors)
+    {
+        if (AActor* Actor = ActorPtr.Get())
+        {
+            FVector Origin, Extent;
+            Actor->GetActorBounds(true, Origin, Extent);
+            DrawWireBox(PDI, FMatrix::Identity, FBox(Origin - Extent, Origin + Extent), FColor::Cyan, SDPG_World);
+        }
+    }
+}
+
+void FScenecapsEditorViewportClient::DrawPivot(FPrimitiveDrawInterface* PDI, const FScenecapsViewportOverlayConfig& Config)
+{
+    for (const TWeakObjectPtr<AActor>& ActorPtr : SelectedActors)
+    {
+        if (AActor* Actor = ActorPtr.Get())
+        {
+            FVector Location = Actor->GetActorLocation();
+            PDI->DrawPoint(Location, FColor::Yellow, 10.0f, SDPG_World);
+            PDI->DrawLine(Location, Location + FVector(0, 0, 100), FColor::Yellow, SDPG_World, 2.0f);
+        }
+    }
+}
+
+void FScenecapsEditorViewportClient::DrawCustom(FPrimitiveDrawInterface* PDI, const FScenecapsViewportOverlayConfig& Config)
+{
+    // Custom overlay - extensions can override this
+}
+
+bool FScenecapsEditorViewportClient::HandleCustomInput(const FInputEvent& InEvent)
+{
+    for (FScenecapsViewportExtension* Ext : FScenecapsViewportExtensionManager::Get().GetExtensionsForPoint(EScenecapsViewportExtensionPoint::ViewportOverlay))
+    {
+        if (Ext && Ext->bEnabled)
+        {
+            if (Ext->HandleViewportInput(InEvent, this))
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void FScenecapsEditorViewportClient::DrawCustomOverlaysWithExtensions(FPrimitiveDrawInterface* PDI)
+{
+    // Draw built-in overlays
+    DrawCustomOverlays(PDI);
+
+    // Draw extension overlays
+    for (FScenecapsViewportExtension* Ext : FScenecapsViewportExtensionManager::Get().GetExtensionsForPoint(EScenecapsViewportExtensionPoint::ViewportOverlay))
+    {
+        if (Ext && Ext->bEnabled)
+        {
+            Ext->DrawViewportOverlay(this, PDI);
+        }
+    }
+}
+
+void FScenecapsEditorViewportClient::TickExtensions(float DeltaSeconds)
+{
+    for (FScenecapsViewportExtension* Ext : FScenecapsViewportExtensionManager::Get().GetExtensionsForPoint(EScenecapsViewportExtensionPoint::ViewportOverlay))
+    {
+        if (Ext && Ext->bEnabled)
+        {
+            Ext->TickViewportOverlay(this, DeltaSeconds);
+        }
+    }
+}
+
+void FScenecapsEditorViewportClient::AddOverlayConfig(const FScenecapsViewportOverlayConfig& Config)
+{
+    OverlayConfigs.RemoveAll([&](const FScenecapsViewportOverlayConfig& C) { return C.Type == Config.Type; });
+    OverlayConfigs.Add(Config);
+}
+
+void FScenecapsEditorViewportClient::RemoveOverlayConfig(EScenecapsViewportOverlayType Type)
+{
+    OverlayConfigs.RemoveAll([&](const FScenecapsViewportOverlayConfig& C) { return C.Type == Type; });
+}
+
+void FScenecapsEditorViewportClient::ClearOverlayConfigs()
+{
+    OverlayConfigs.Empty();
 }

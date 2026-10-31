@@ -2,7 +2,6 @@
 #include "ScenecapsEditorOutliner.h"
 #include "ScenecapsLocalization.h"
 #include "ScenecapsAsset.h"
-#include "ScenecapsStaticAsset.h"
 #include "ScenecapsEditorToolkit.h"
 #include "ScenecapsEditorAssetProxy.h"
 #include "ScenecapsClipboard.h"
@@ -854,44 +853,42 @@ FReply SScenecapsEditorOutliner::OnDuplicateSelected()
     const TArray<FGuid> Sel = GetSelectedEntryIds();
     if (Sel.Num() == 0) return FReply::Handled();
 
-    // Duplicate = Copy to clipboard then Paste（底层自动处理 ID 重映射）
+    const FScopedTransaction Transaction(SC_LOCTEXT(DuplicateEntriesTx, "Duplicate Scene Entries"));
+    Proxy->Modify();
+
+    // Collect all selected entries and their descendants
+    TSet<FGuid> ToDuplicate;
+    for (const FGuid& Id : Sel) CollectEntryAndDescendants(Id, ToDuplicate);
+
+    // Duplicate entries by copying to clipboard and pasting at the same parent level
+    // Save current clipboard state
+    TArray<FScenecapsEntry> SavedClipboard;
+    if (ScenecapsClipboard::HasData())
+    {
+        SavedClipboard = ScenecapsClipboard::Get();
+    }
+
+    // Copy selected entries to clipboard
+    Proxy->CopyEntriesToClipboard(ToDuplicate);
+
+    // Paste each root entry to its original parent
     TSet<FGuid> SelSet(Sel);
-    TArray<FGuid> Roots;
     for (const FGuid& Id : Sel)
     {
         FScenecapsEditorEntryView V;
         if (!Proxy->GetEntryView(Id, V)) continue;
-        if (!SelSet.Contains(V.ParentId)) Roots.Add(Id);
+        if (!SelSet.Contains(V.ParentId))
+        {
+            Proxy->PasteFromClipboard(V.ParentId);
+        }
     }
-    if (Roots.Num() == 0) return FReply::Handled();
 
-    TSet<FGuid> Dup;
-    for (const FGuid& Id : Roots) CollectEntryAndDescendants(Id, Dup);
-
-    // 暂存：Copy 到 clipboard → 恢复原 clipboard → Paste 到同父级
-    // 简化：直接调用 Copy + Paste，但需要保持原 Clipboard
-    // 这里采用一次性的本地复制（不污染 clipboard）：
-    const FScopedTransaction Transaction(SC_LOCTEXT(DuplicateEntriesTx, "Duplicate Scene Entries"));
-    Proxy->Modify();
-
-    // 先 Copy 到剪贴板（这会覆盖原数据，可接受）
-    Proxy->CopyEntriesToClipboard(Dup);
-    // Paste 到原始父级：找每个 root 的原父级
-    for (const FGuid& RootId : Roots)
+    // Restore clipboard
+    ScenecapsClipboard::Clear();
+    if (SavedClipboard.Num() > 0)
     {
-        FScenecapsEditorEntryView V;
-        if (!Proxy->GetEntryView(RootId, V)) continue;
-        // 但要 paste 的是这个 root 及其子树的整个拷贝
-        // 逐 root 处理
+        ScenecapsClipboard::Set(MoveTemp(SavedClipboard));
     }
-    // 简化策略：对所有 roots 一起 paste 到共同父级（第一个 root 的父级）
-    FGuid ParentForPaste = Proxy->GetRootId();
-    for (const FGuid& RootId : Roots)
-    {
-        FScenecapsEditorEntryView V;
-        if (Proxy->GetEntryView(RootId, V)) { ParentForPaste = V.ParentId; break; }
-    }
-    Proxy->PasteFromClipboard(ParentForPaste);
     Proxy->MarkDirty();
 
     T->RebuildPreviewScene();

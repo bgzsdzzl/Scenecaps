@@ -3,20 +3,15 @@
 
 #include "ScenecapsActorFactory.h"
 #include "ScenecapsFactory.h"
-#include "ScenecapsStaticFactory.h"
-#include "ScenecapsStaticActorFactory.h"
 #include "AssetDefinition_Scenecaps.h"
-#include "AssetDefinition_ScenecapsStatic.h"
-#include "AssetDefinitionRegistry.h"
 #include "ScenecapsAsset.h"
-#include "ScenecapsStaticAsset.h"
 #include "ScenecapsActor.h"
-#include "ScenecapsStaticActor.h"
 #include "ScenecapsEditorCommands.h"
 #include "ScenecapsEditorToolkit.h"
 #include "ScenecapsLocalization.h"
 #include "ScenecapsModule.h"
 #include "ScenecapsAssetCategories.h"
+#include "AssetDefinitionRegistry.h"
 
 #include "Widgets/SWindow.h"
 #include "Framework/Application/SlateApplication.h"
@@ -34,15 +29,11 @@ void FScenecapsEditorModule::StartupModule()
 {
     (void)UScenecapsActorFactory::StaticClass();
     (void)UScenecapsFactory::StaticClass();
-    (void)UScenecapsStaticFactory::StaticClass();
-    (void)UScenecapsStaticActorFactory::StaticClass();
     (void)UAssetDefinition_Scenecaps::StaticClass();
-    (void)UAssetDefinition_ScenecapsStatic::StaticClass();
 
     if (UAssetDefinitionRegistry* Registry = UAssetDefinitionRegistry::Get())
     {
         Registry->RegisterAssetDefinition(GetMutableDefault<UAssetDefinition_Scenecaps>());
-        Registry->RegisterAssetDefinition(GetMutableDefault<UAssetDefinition_ScenecapsStatic>());
     }
 
     if (FModuleManager::Get().IsModuleLoaded(TEXT("AssetTools")))
@@ -98,13 +89,10 @@ void FScenecapsEditorModule::RegisterContentBrowserMenus()
             if (!Context) return;
 
             TArray<UScenecapsAsset*> SceneAssets;
-            TArray<UScenecapsStaticAsset*> StaticAssets;
             for (const FAssetData& Data : Context->SelectedAssets)
             {
                 if (UScenecapsAsset* A = Cast<UScenecapsAsset>(Data.GetAsset()))
                     SceneAssets.Add(A);
-                else if (UScenecapsStaticAsset* S = Cast<UScenecapsStaticAsset>(Data.GetAsset()))
-                    StaticAssets.Add(S);
             }
 
             if (SceneAssets.Num() > 0)
@@ -129,63 +117,28 @@ void FScenecapsEditorModule::RegisterContentBrowserMenus()
                                 FScenecapsEditorCommands::GatherFromSelection(A);
                         })));
 
-                InSection.AddMenuEntry("Scenecaps_ConvertToStatic",
-                    SC_LOCTEXT(ConvertToStatic, "Convert to Static"),
-                    SC_LOCTEXT(ConvertToStaticTip, "Bake this Scene Collection into a self-contained Static asset"),
+                InSection.AddMenuEntry("Scenecaps_ExportCustomBinary",
+                    FText::FromString(TEXT("Export to Custom Binary")),
+                    FText::FromString(TEXT("Export this Scene Collection to a custom binary format")),
                     FSlateIcon(),
                     FUIAction(FExecuteAction::CreateLambda([SceneAssets]()
                         {
                             for (UScenecapsAsset* A : SceneAssets)
-                                FScenecapsEditorCommands::ConvertToStatic(A);
-                        })));
-            }
-
-            if (StaticAssets.Num() > 0)
-            {
-                InSection.AddMenuEntry("Scenecaps_PlaceStaticIntoLevel",
-                    FText::FromString(TEXT("Place into Level (Static)")),
-                    SC_LOCTEXT(PlaceStaticIntoLevelTip, "Spawn a Static Scenecaps container in the current level"),
-                    FSlateIcon(),
-                    FUIAction(FExecuteAction::CreateLambda([StaticAssets]()
-                        {
-                            for (UScenecapsStaticAsset* A : StaticAssets)
-                                FScenecapsEditorCommands::PlaceStaticIntoCurrentLevel(A);
-                        })));
-
-                InSection.AddMenuEntry("Scenecaps_GatherStaticFromSelection",
-                    FText::FromString(TEXT("Gather from Selection (Static)")),
-                    SC_LOCTEXT(GatherStaticFromSelectionTip, "Bake selected Actors directly into this Static asset"),
-                    FSlateIcon(),
-                    FUIAction(FExecuteAction::CreateLambda([StaticAssets]()
-                        {
-                            for (UScenecapsStaticAsset* A : StaticAssets)
-                                FScenecapsEditorCommands::GatherStaticFromSelection(A);
-                        })));
-
-                // [Export to Custom Binary menu entry]
-                InSection.AddMenuEntry("Scenecaps_ExportCustomBinary",
-                    FText::FromString(TEXT("Export to Custom Binary")),
-                    FText::FromString(TEXT("Export this Static Scene Collection to a custom binary format")),
-                    FSlateIcon(),
-                    FUIAction(FExecuteAction::CreateLambda([StaticAssets]()
-                        {
-                            for (UScenecapsStaticAsset* A : StaticAssets)
                                 FScenecapsEditorCommands::ExportToCustomBinary(A);
                         })));
 
                 InSection.AddMenuEntry("Scenecaps_ImportCustomBinary",
                     FText::FromString(TEXT("Import from Custom Binary")),
-                    FText::FromString(TEXT("Import entries from a custom binary file (.scnb) into this Static asset")),
+                    FText::FromString(TEXT("Import entries from a custom binary file (.scnb) into this asset")),
                     FSlateIcon(),
-                    FUIAction(FExecuteAction::CreateLambda([StaticAssets]()
+                    FUIAction(FExecuteAction::CreateLambda([SceneAssets]()
                         {
-                            for (UScenecapsStaticAsset* A : StaticAssets)
+                            for (UScenecapsAsset* A : SceneAssets)
                                 FScenecapsEditorCommands::ImportFromCustomBinary(A);
                         })));
             }
         }));
-
-    }
+}
 
 void FScenecapsEditorModule::RegisterConsoleCommands()
 {
@@ -208,7 +161,7 @@ void FScenecapsEditorModule::RegisterConsoleCommands()
     {
         IConsoleObject* Cmd = CM.RegisterConsoleCommand(
             TEXT("Scenecaps.DumpWorldPartition"),
-            TEXT("Dump all ScenecapsActors / ScenecapsStaticActors with their Data Layer status."),
+            TEXT("Dump all ScenecapsActors with their Data Layer status."),
             FConsoleCommandDelegate::CreateLambda([]()
                 {
                     if (!GEditor) return;
@@ -229,18 +182,6 @@ void FScenecapsEditorModule::RegisterConsoleCommands()
                             *Actor->GetDataLayerStatusText().ToString());
                     }
 
-                    for (TActorIterator<AScenecapsStaticActor> It(World); It; ++It)
-                    {
-                        AScenecapsStaticActor* Actor = *It;
-                        if (!Actor) continue;
-                        ++Count;
-                        UE_LOG(LogScenecaps, Log, TEXT("[Static] %s Spawned=%d DL=%s Status=%s"),
-                            *Actor->GetActorNameOrLabel(),
-                            Actor->GetSpawnedCount(),
-                            Actor->TargetDataLayer.IsNull() ? TEXT("<none>") : *Actor->TargetDataLayer.GetAssetName(),
-                            *Actor->GetDataLayerStatusText().ToString());
-                    }
-
                     UE_LOG(LogScenecaps, Log, TEXT("Total ScenecapsActors: %d"), Count);
                 }),
             ECVF_Default);
@@ -251,3 +192,7 @@ void FScenecapsEditorModule::RegisterConsoleCommands()
 #undef LOCTEXT_NAMESPACE
 
 IMPLEMENT_MODULE(FScenecapsEditorModule, ScenecapsEditor)
+
+
+
+

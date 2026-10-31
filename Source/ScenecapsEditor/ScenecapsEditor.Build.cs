@@ -6,15 +6,38 @@ public class ScenecapsEditor : ModuleRules
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        PublicDependencyModuleNames.AddRange(new string[]
-        {
+        PublicDependencyModuleNames.AddRange(new string[] 
+        { 
             "Core",
             "CoreUObject",
             "Engine",
             "Scenecaps",
-            "AssetDefinition"
+            "AssetDefinition",
+            "Slate",
+            "SlateCore"
         });
 
-PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd", "EditorFramework", "EditorWidgets", "EditorStyle", "AdvancedPreviewScene", "Slate", "SlateCore", "AssetTools", "AssetRegistry", "PropertyEditor", "ToolMenus", "LevelEditor", "AppFramework", "InputCore", "ContentBrowser" });
+        PrivateDependencyModuleNames.AddRange(new string[] 
+        { 
+            "UnrealEd", 
+            "EditorFramework", 
+            "EditorWidgets", 
+            "EditorStyle", 
+            "AdvancedPreviewScene", 
+            "AssetTools", 
+            "AssetRegistry", 
+            "PropertyEditor", 
+            "ToolMenus", 
+            "LevelEditor", 
+            "AppFramework", 
+            "InputCore", 
+            "ContentBrowser" 
+        });
+
+        // Ensure public headers are accessible
+        PublicIncludePaths.AddRange(new string[] 
+        {
+            ModuleDirectory + "/Public"
+        });
     }
 }

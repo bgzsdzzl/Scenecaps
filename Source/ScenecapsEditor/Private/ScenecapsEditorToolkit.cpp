@@ -98,7 +98,13 @@ void FScenecapsEditorToolkit::UnregisterTabSpawners(const TSharedRef<FTabManager
 
 TSharedRef<SDockTab> FScenecapsEditorToolkit::SpawnTab_Viewport(const FSpawnTabArgs&)
 {
-    TSharedRef<SScenecapsEditorViewport> Viewport = SNew(SScenecapsEditorViewport).Toolkit(SharedThis(this));
+    if (!ViewportSettings.IsValid())
+    {
+        ViewportSettings = MakeShared<UScenecapsViewportSettings>();
+    }
+    TSharedRef<SScenecapsEditorViewport> Viewport = SNew(SScenecapsEditorViewport)
+        .Toolkit(SharedThis(this))
+        .ViewportSettings(ViewportSettings);
     ViewportWidget = Viewport;
 
     TSharedRef<SAssetDropTarget> DropTarget =

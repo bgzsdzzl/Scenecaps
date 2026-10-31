@@ -17,8 +17,9 @@ class IDetailsView;
 class IStructureDetailsView;
 class FStructOnScope;
 class SBox;
+class UScenecapsViewportSettings;
 
-class FScenecapsEditorToolkit : public FAssetEditorToolkit
+class SCENECAPSEDITOR_API FScenecapsEditorToolkit : public FAssetEditorToolkit
 {
 public:
     void InitEditor(const EToolkitMode::Type Mode,
@@ -37,7 +38,8 @@ public:
     TSharedPtr<FScenecapsEditorAssetProxy> GetAssetProxy() const { return AssetProxy; }
     UObject* GetEditingAssetObject() const { return AssetProxy.IsValid() ? AssetProxy->GetAssetObject() : nullptr; }
 
-    TSharedPtr<SScenecapsEditorViewport> GetViewportWidget() const { return ViewportWidget.Pin(); }
+    TWeakPtr<SScenecapsEditorViewport> GetViewportWidget() const { return ViewportWidget; }
+    TSharedPtr<UScenecapsViewportSettings> GetViewportSettings() const { return ViewportSettings; }
 
     FName GetPreviewVariant() const { return PreviewVariant; }
     void  SetPreviewVariant(FName InVariant);
@@ -103,6 +105,8 @@ private:
     FVector CachedEditorViewLocation = FVector::ZeroVector;
     FRotator CachedEditorViewRotation = FRotator::ZeroRotator;
     bool bEditorViewDirty = false;
+
+    TSharedPtr<UScenecapsViewportSettings> ViewportSettings;
 
     static const FName ViewportTabId;
     static const FName OutlinerTabId;
