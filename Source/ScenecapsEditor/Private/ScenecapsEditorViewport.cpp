@@ -7,6 +7,7 @@
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Editor.h"
 
 void SScenecapsEditorViewport::Construct(const FArguments& InArgs)
 {

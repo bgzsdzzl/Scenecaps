@@ -255,6 +255,9 @@ void FScenecapsEditorToolkit::RebuildPreviewScene()
     UWorld* World = PreviewScene->GetWorld();
     if (!World) return;
 
+    const FGuid RootId = AssetProxy->GetRootId();
+    if (!RootId.IsValid()) return;
+
     TSet<FGuid> Spawned;
 
     TFunction<void(const FGuid&, const FTransform&)> SpawnRecursive =
@@ -264,6 +267,8 @@ void FScenecapsEditorToolkit::RebuildPreviewScene()
             if (!AssetProxy->HasEntry(EntryId)) return;
 
             const FScenecapsEditorEntryView Eff = AssetProxy->GetEffectiveView(EntryId, PreviewVariant);
+            if (!Eff.EntryId.IsValid()) return;
+            
             const FTransform FinalWorld = Eff.RelativeTransform * ParentWorld;
 
             AActor* Actor = SpawnPreviewEntry(Eff, World);
