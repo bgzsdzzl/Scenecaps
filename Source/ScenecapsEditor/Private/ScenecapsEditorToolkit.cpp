@@ -10,8 +10,10 @@
 
 #include "DragAndDrop/AssetDragDropOp.h"
 #include "Engine/World.h"
-#include "Components/SkyLightComponent.h"
+#include "Components/PointLightComponent.h"
 #include "Components/DirectionalLightComponent.h"
+#include "Components/SkyLightComponent.h"
+#include "EngineUtils.h"
 #include "Framework/Docking/TabManager.h"
 #include "GameFramework/Actor.h"
 #include "IDetailsView.h"
@@ -53,32 +55,27 @@ void FScenecapsEditorToolkit::InitEditor(const EToolkitMode::Type Mode,
     FPreviewScene::ConstructionValues CVS;
     CVS.bAllowAudioPlayback = false;
     CVS.bCreatePhysicsScene = true;
-    CVS.LightBrightness = 3.14f;
-    CVS.SkyBrightness = 1.0f;
+    CVS.LightBrightness = 0.0f;
+    CVS.SkyBrightness = 0.0f;
     PreviewScene = MakeUnique<FPreviewScene>(CVS);
     PreviewScene->SetLightDirection(FRotator(-45.f, -30.f, 0.f));
     PreviewScene->SetLightColor(FColor::White);
 
-    // Configure simple lighting (no sky atmosphere/skybox)
+    // Disable all global lighting - no sky, no directional light, no sky light
     if (UWorld* World = PreviewScene->GetWorld())
     {
-        // Configure the PreviewScene's built-in Sky Light for simple ambient lighting
-        USkyLightComponent* SkyLight = PreviewScene->SkyLight;
-        if (SkyLight)
+        // Disable Sky Light completely
+        if (USkyLightComponent* SkyLight = PreviewScene->SkyLight)
         {
-            SkyLight->SourceType = ESkyLightSourceType::SLS_SpecifiedCubemap;
-            SkyLight->SetIntensity(1.0f);
-            SkyLight->bRealTimeCapture = false;
+            SkyLight->SetIntensity(0.0f);
+            SkyLight->SetVisibility(false);
         }
 
-        // Configure directional light
-        UDirectionalLightComponent* LightComp = PreviewScene->DirectionalLight;
-        if (LightComp)
+        // Disable Directional Light completely
+        if (UDirectionalLightComponent* LightComp = PreviewScene->DirectionalLight)
         {
-            LightComp->SetIntensity(5.0f);
-            LightComp->bAtmosphereSunLight = false;
-            LightComp->SetLightSourceAngle(0.53f);
-            LightComp->SetWorldRotation(FRotator(-45.f, -30.f, 0.f).Quaternion());
+            LightComp->SetIntensity(0.0f);
+            LightComp->SetVisibility(false);
         }
     }
 
@@ -335,7 +332,26 @@ void FScenecapsEditorToolkit::RebuildPreviewScene()
 
 AActor* FScenecapsEditorToolkit::SpawnPreviewEntry(const FScenecapsEditorEntryView& Effective, UWorld* World)
 {
-    return AssetProxy.IsValid() ? AssetProxy->SpawnPreviewEntry(Effective, World) : nullptr;
+    AActor* Actor = AssetProxy.IsValid() ? AssetProxy->SpawnPreviewEntry(Effective, World) : nullptr;
+    
+    // Add a small point light to each preview actor for lighting
+    if (Actor && World)
+    {
+        UPointLightComponent* PointLight = NewObject<UPointLightComponent>(Actor, TEXT("PreviewPointLight"));
+        PointLight->RegisterComponent();
+        PointLight->AttachToComponent(Actor->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
+        PointLight->SetRelativeLocation(FVector(0, 0, 50));
+        PointLight->SetIntensity(500.0f);
+        PointLight->SetAttenuationRadius(500.0f);
+        PointLight->SetLightColor(FLinearColor(1.0f, 0.95f, 0.9f));
+        PointLight->SetSourceRadius(10.0f);
+        PointLight->SetSoftSourceRadius(5.0f);
+        PointLight->SetCastShadows(false);
+        PointLight->bUseInverseSquaredFalloff = true;
+        PointLight->SetMobility(EComponentMobility::Movable);
+    }
+    
+    return Actor;
 }
 
 void FScenecapsEditorToolkit::RequestRedraw()
