@@ -10,7 +10,6 @@
 
 #include "DragAndDrop/AssetDragDropOp.h"
 #include "Engine/World.h"
-#include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Framework/Docking/TabManager.h"
@@ -60,34 +59,25 @@ void FScenecapsEditorToolkit::InitEditor(const EToolkitMode::Type Mode,
     PreviewScene->SetLightDirection(FRotator(-45.f, -30.f, 0.f));
     PreviewScene->SetLightColor(FColor::White);
 
-    // Configure sky atmosphere and lighting like the level editor viewport
+    // Configure simple lighting (no sky atmosphere/skybox)
     if (UWorld* World = PreviewScene->GetWorld())
     {
-        // Add Sky Atmosphere component to the world
-        USkyAtmosphereComponent* SkyAtmosphere = NewObject<USkyAtmosphereComponent>(World);
-        if (SkyAtmosphere)
-        {
-            SkyAtmosphere->RegisterComponentWithWorld(World);
-        }
-
-        // Configure the PreviewScene's built-in Sky Light to use real-time capture with Sky Atmosphere
+        // Configure the PreviewScene's built-in Sky Light for simple ambient lighting
         USkyLightComponent* SkyLight = PreviewScene->SkyLight;
-        if (SkyLight && SkyAtmosphere)
+        if (SkyLight)
         {
-            SkyLight->SourceType = ESkyLightSourceType::SLS_CapturedScene;
-            SkyLight->SetIntensity(100.0f);  // 降低强度：1000 -> 100
-            SkyLight->bRealTimeCapture = true;
-            // SkyLight captures SkyAtmosphere automatically when in the same world
-            SkyLight->RecaptureSky();
+            SkyLight->SourceType = ESkyLightSourceType::SLS_SpecifiedCubemap;
+            SkyLight->SetIntensity(1.0f);
+            SkyLight->bRealTimeCapture = false;
         }
 
-        // Configure directional light as atmosphere sun
+        // Configure directional light
         UDirectionalLightComponent* LightComp = PreviewScene->DirectionalLight;
         if (LightComp)
         {
-            LightComp->SetIntensity(10000.0f);  // 降低强度：100000 -> 10000
-            LightComp->bAtmosphereSunLight = true;
-            LightComp->SetLightSourceAngle(0.53f); // Sun angular diameter
+            LightComp->SetIntensity(5.0f);
+            LightComp->bAtmosphereSunLight = false;
+            LightComp->SetLightSourceAngle(0.53f);
             LightComp->SetWorldRotation(FRotator(-45.f, -30.f, 0.f).Quaternion());
         }
     }
