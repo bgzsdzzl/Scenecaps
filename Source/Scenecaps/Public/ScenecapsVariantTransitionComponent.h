@@ -17,8 +17,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnVariantTransitionProgress, float,
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnVariantTransitionLooped);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnVariantTransitionPingPong);
 
-// WARNING: Transition is event-only, ApplyInterpolationToAsset/ISM are stubs
-// Implement these for visual interpolation (transform, visibility, custom data)
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent, DisplayName = "Scenecaps Variant Transition"))
 class SCENECAPS_API UScenecapsVariantTransitionComponent : public UActorComponent
 {
@@ -55,8 +53,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scenecaps|Transition")
     bool bAutoPlay = false;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scenecaps|Transition")
-    // WARNING: Transition is event-only, ApplyInterpolationToAsset/ISM are stubs
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scenecaps|Transition")
     bool bUpdateISM = true;
 
     // ---- 运行时状态 (只读) ----

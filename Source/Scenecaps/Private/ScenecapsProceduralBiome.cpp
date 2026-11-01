@@ -11,6 +11,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInterface.h"
+#include "ScenecapsAsset.h"
+#include "ScenecapsISMComponent.h"
 
 
 
@@ -177,8 +179,96 @@ UInstancedStaticMeshComponent* UScenecapsBiomeSamplerComponent::GenerateToISM(
     const FTransform& WorldTransform,
     AActor* ContainerActor)
 {
-    // Not implemented yet - use PreviewGenerate + SpawnCollectionAsISM from UScenecapsAsset
-    return nullptr;
+    if (!World) return nullptr;
+
+    UScenecapsBiomeAsset* Asset = BiomeAsset.LoadSynchronous();
+    if (!Asset) return nullptr;
+
+    // 生成预览变换
+    TArray<FTransform> Transforms = PreviewGenerate(WorldTransform, 10000);
+    if (Transforms.Num() == 0) return nullptr;
+
+    // 按 Mesh 分组
+    TMap<UStaticMesh*, TArray<FTransform>> MeshToTransforms;
+    for (const FTransform& Transform : Transforms)
+    {
+        // 这里简化：使用第一个 Layer 的第一个 Entry 的 Mesh
+        // 实际应该根据生成逻辑选择 Mesh
+        if (Asset->Layers.Num() > 0 && Asset->Layers[0].Entries.Num() > 0)
+        {
+            UStaticMesh* Mesh = Asset->Layers[0].Entries[0].Mesh.LoadSynchronous();
+            if (Mesh)
+            {
+                MeshToTransforms.FindOrAdd(Mesh).Add(Transform);
+            }
+        }
+    }
+
+    if (MeshToTransforms.Num() == 0) return nullptr;
+
+    // 创建或使用容器 Actor
+    AActor* TargetContainer = ContainerActor;
+    bool bOwnsContainer = false;
+    if (!TargetContainer)
+    {
+        TargetContainer = World->SpawnActor<AActor>();
+        if (!TargetContainer) return nullptr;
+        TargetContainer->SetActorLabel(TEXT("BiomeISMContainer"));
+        bOwnsContainer = true;
+    }
+
+    // 添加管理组件
+    UScenecapsISMComponent* Manager = TargetContainer->FindComponentByClass<UScenecapsISMComponent>();
+    if (!Manager)
+    {
+        Manager = Cast<UScenecapsISMComponent>(TargetContainer->AddComponentByClass(UScenecapsISMComponent::StaticClass(), false, FTransform::Identity, false));
+    }
+
+    USceneComponent* Root = TargetContainer->GetRootComponent();
+    if (!Root)
+    {
+        Root = NewObject<USceneComponent>(TargetContainer, TEXT("BiomeISMRoot"));
+        TargetContainer->SetRootComponent(Root);
+    }
+
+    UInstancedStaticMeshComponent* FirstISM = nullptr;
+
+    // 为每个 Mesh 创建 ISM
+    for (auto& Pair : MeshToTransforms)
+    {
+        UStaticMesh* Mesh = Pair.Key;
+        const TArray<FTransform>& MeshTransforms = Pair.Value;
+
+        UInstancedStaticMeshComponent* ISM = NewObject<UInstancedStaticMeshComponent>(TargetContainer);
+        ISM->SetStaticMesh(Mesh);
+        ISM->RegisterComponentWithWorld(World);
+        ISM->AttachToComponent(Root, FAttachmentTransformRules::KeepRelativeTransform);
+
+        // 添加实例
+        for (const FTransform& Transform : MeshTransforms)
+        {
+            ISM->AddInstance(Transform, true);
+        }
+
+        // Lumen 设置
+        ISM->SetAffectDistanceFieldLighting(true);
+        ISM->SetAffectDynamicIndirectLighting(true);
+        ISM->SetCastShadow(true);
+        ISM->SetLightingChannels(true, false, false);
+        ISM->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+        ISM->SetGenerateOverlapEvents(false);
+        ISM->SetCanEverAffectNavigation(false);
+        ISM->SetNumCustomDataFloats(4);
+
+        if (!FirstISM) FirstISM = ISM;
+    }
+
+    if (Manager)
+    {
+        Manager->RegisterContainerActor(TargetContainer);
+    }
+
+    return FirstISM;
 }
 
 UHierarchicalInstancedStaticMeshComponent* UScenecapsBiomeSamplerComponent::GenerateToHISM(
@@ -186,7 +276,96 @@ UHierarchicalInstancedStaticMeshComponent* UScenecapsBiomeSamplerComponent::Gene
     const FTransform& WorldTransform,
     AActor* ContainerActor)
 {
-    // Not implemented yet - use PreviewGenerate + SpawnCollectionAsHISM from UScenecapsAsset
-    return nullptr;
+    if (!World) return nullptr;
+
+    UScenecapsBiomeAsset* Asset = BiomeAsset.LoadSynchronous();
+    if (!Asset) return nullptr;
+
+    // 生成预览变换
+    TArray<FTransform> Transforms = PreviewGenerate(WorldTransform, 10000);
+    if (Transforms.Num() == 0) return nullptr;
+
+    // 按 Mesh 分组
+    TMap<UStaticMesh*, TArray<FTransform>> MeshToTransforms;
+    for (const FTransform& Transform : Transforms)
+    {
+        if (Asset->Layers.Num() > 0 && Asset->Layers[0].Entries.Num() > 0)
+        {
+            UStaticMesh* Mesh = Asset->Layers[0].Entries[0].Mesh.LoadSynchronous();
+            if (Mesh)
+            {
+                MeshToTransforms.FindOrAdd(Mesh).Add(Transform);
+            }
+        }
+    }
+
+    if (MeshToTransforms.Num() == 0) return nullptr;
+
+    // 创建或使用容器 Actor
+    AActor* TargetContainer = ContainerActor;
+    bool bOwnsContainer = false;
+    if (!TargetContainer)
+    {
+        TargetContainer = World->SpawnActor<AActor>();
+        if (!TargetContainer) return nullptr;
+        TargetContainer->SetActorLabel(TEXT("BiomeHISMContainer"));
+        bOwnsContainer = true;
+    }
+
+    // 添加管理组件
+    UScenecapsISMComponent* Manager = TargetContainer->FindComponentByClass<UScenecapsISMComponent>();
+    if (!Manager)
+    {
+        Manager = Cast<UScenecapsISMComponent>(TargetContainer->AddComponentByClass(UScenecapsISMComponent::StaticClass(), false, FTransform::Identity, false));
+    }
+
+    USceneComponent* Root = TargetContainer->GetRootComponent();
+    if (!Root)
+    {
+        Root = NewObject<USceneComponent>(TargetContainer, TEXT("BiomeHISMRoot"));
+        TargetContainer->SetRootComponent(Root);
+    }
+
+    UHierarchicalInstancedStaticMeshComponent* FirstHISM = nullptr;
+
+    // 为每个 Mesh 创建 HISM
+    for (auto& Pair : MeshToTransforms)
+    {
+        UStaticMesh* Mesh = Pair.Key;
+        const TArray<FTransform>& MeshTransforms = Pair.Value;
+
+        UHierarchicalInstancedStaticMeshComponent* HISM = NewObject<UHierarchicalInstancedStaticMeshComponent>(TargetContainer);
+        HISM->SetStaticMesh(Mesh);
+        HISM->RegisterComponentWithWorld(World);
+        HISM->AttachToComponent(Root, FAttachmentTransformRules::KeepRelativeTransform);
+        HISM->PerInstanceSMData.Empty();
+
+        for (const FTransform& Transform : MeshTransforms)
+        {
+            HISM->AddInstance(Transform, true);
+        }
+
+        // Lumen 设置
+        HISM->SetAffectDistanceFieldLighting(true);
+        HISM->SetAffectDynamicIndirectLighting(true);
+        HISM->SetCastShadow(true);
+        HISM->SetLightingChannels(true, false, false);
+        HISM->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+        HISM->SetGenerateOverlapEvents(false);
+        HISM->SetCanEverAffectNavigation(false);
+        HISM->bEnableDensityScaling = true;
+
+        // 强制重建 HISM 层级树
+        HISM->BuildTreeIfOutdated(true, false);
+
+        if (!FirstHISM) FirstHISM = HISM;
+    }
+
+    if (Manager)
+    {
+        Manager->RegisterContainerActor(TargetContainer);
+    }
+
+    return FirstHISM;
 }
 
