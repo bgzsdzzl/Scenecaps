@@ -16,6 +16,8 @@
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
 #include "ScopedTransaction.h"
+#include "PropertyEditorModule.h"
+#include "IDetailPropertyRow.h"
 
 
 TSharedRef<IDetailCustomization> FScenecapsActorCustomization::MakeInstance()
@@ -52,14 +54,7 @@ void FScenecapsActorCustomization::CustomizeDetails(IDetailLayoutBuilder& Detail
         .ValueContent()
         [
             SNew(STextBlock)
-                .Text_Lambda([this]()
-                    {
-                        if (AScenecapsActor* A = CachedActor.Get())
-                        {
-                            return FText::AsNumber(A->GetSpawnedCount());
-                        }
-                        return FText::AsNumber(0);
-                    })
+                .Text(this, &FScenecapsActorCustomization::GetSpawnedCountText)
                 .Font(IDetailLayoutBuilder::GetDetailFont())
         ];
 
@@ -74,14 +69,7 @@ void FScenecapsActorCustomization::CustomizeDetails(IDetailLayoutBuilder& Detail
         .ValueContent()
         [
             SNew(STextBlock)
-                .Text_Lambda([this]()
-                    {
-                        if (AScenecapsActor* A = CachedActor.Get())
-                        {
-                            return A->GetDataLayerStatusText();
-                        }
-                        return FText::GetEmpty();
-                    })
+                .Text(this, &FScenecapsActorCustomization::GetDataLayerStatusTextSafe)
                 .Font(IDetailLayoutBuilder::GetDetailFont())
         ];
 
@@ -98,7 +86,7 @@ void FScenecapsActorCustomization::CustomizeDetails(IDetailLayoutBuilder& Detail
                     SNew(SButton)
                         .Text(SC_LOCTEXT(SelectAll, "Select All"))
                         .ToolTipText(SC_LOCTEXT(SelectAllTip, "Select every Actor spawned by this container"))
-                        .OnClicked(FOnClicked::CreateSP(this, &FScenecapsActorCustomization::OnSelectAllSpawned))
+                        .OnClicked(this, &FScenecapsActorCustomization::OnSelectAllSpawned)
                 ]
 
                 + SHorizontalBox::Slot()
@@ -108,7 +96,7 @@ void FScenecapsActorCustomization::CustomizeDetails(IDetailLayoutBuilder& Detail
                     SNew(SButton)
                         .Text(SC_LOCTEXT(FocusOn, "Focus"))
                         .ToolTipText(SC_LOCTEXT(FocusOnTip, "Focus the viewport on this container and its contents"))
-                        .OnClicked(FOnClicked::CreateSP(this, &FScenecapsActorCustomization::OnFocusOnContainer))
+                        .OnClicked(this, &FScenecapsActorCustomization::OnFocusOnContainer)
                 ]
 
                 + SHorizontalBox::Slot()
@@ -118,7 +106,7 @@ void FScenecapsActorCustomization::CustomizeDetails(IDetailLayoutBuilder& Detail
                     SNew(SButton)
                         .Text(SC_LOCTEXT(Rebuild, "Rebuild"))
                         .ToolTipText(SC_LOCTEXT(RebuildTip, "Clear and regenerate the container contents"))
-                        .OnClicked(FOnClicked::CreateSP(this, &FScenecapsActorCustomization::OnRebuildClicked))
+                        .OnClicked(this, &FScenecapsActorCustomization::OnRebuildClicked)
                 ]
 
                 + SHorizontalBox::Slot()
@@ -128,7 +116,7 @@ void FScenecapsActorCustomization::CustomizeDetails(IDetailLayoutBuilder& Detail
                     SNew(SButton)
                         .Text(SC_LOCTEXT(Clear, "Clear"))
                         .ToolTipText(SC_LOCTEXT(ClearTip, "Destroy every Actor spawned by this container"))
-                        .OnClicked(FOnClicked::CreateSP(this, &FScenecapsActorCustomization::OnClearClicked))
+                        .OnClicked(this, &FScenecapsActorCustomization::OnClearClicked)
                 ]
         ];
 }
@@ -212,4 +200,22 @@ FReply FScenecapsActorCustomization::OnClearClicked()
         Actor->Clear();
     }
     return FReply::Handled();
+}
+
+FText FScenecapsActorCustomization::GetSpawnedCountText() const
+{
+    if (AScenecapsActor* A = CachedActor.Get())
+    {
+        return FText::AsNumber(A->GetSpawnedCount());
+    }
+    return FText::AsNumber(0);
+}
+
+FText FScenecapsActorCustomization::GetDataLayerStatusTextSafe() const
+{
+    if (AScenecapsActor* A = CachedActor.Get())
+    {
+        return A->GetDataLayerStatusText();
+    }
+    return FText::GetEmpty();
 }

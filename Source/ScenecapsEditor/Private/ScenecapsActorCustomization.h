@@ -2,10 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "IDetailCustomization.h"
-#include "Framework/Commands/UIAction.h"
 #include "Widgets/Input/SButton.h"
 #include "UObject/WeakObjectPtr.h"
-#include "UObject/ObjectPtr.h"
 #include "InputCoreTypes.h"
 
 class AScenecapsActor;
@@ -22,6 +20,9 @@ private:
     FReply OnFocusOnContainer();
     FReply OnRebuildClicked();
     FReply OnClearClicked();
+
+    FText GetSpawnedCountText() const;
+    FText GetDataLayerStatusTextSafe() const;
 
     TWeakObjectPtr<AScenecapsActor> CachedActor;
 };
