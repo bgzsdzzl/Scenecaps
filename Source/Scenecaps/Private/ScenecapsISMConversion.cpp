@@ -159,12 +159,14 @@ UInstancedStaticMeshComponent* UScenecapsISMConversion::ConvertActorsToISM(
         }
     }
 
-    if (MeshToTransforms.Num() == 0) return nullptr;
+if (MeshToTransforms.Num() == 0) return nullptr;
 
     if (!ContainerActor)
     {
         ContainerActor = World->SpawnActor<AActor>();
+#if WITH_EDITOR
         ContainerActor->SetActorLabel(TEXT("ISMContainer_Converted"));
+#endif
     }
 
     USceneComponent* Root = ContainerActor->GetRootComponent();
@@ -246,12 +248,14 @@ UHierarchicalInstancedStaticMeshComponent* UScenecapsISMConversion::ConvertActor
         }
     }
 
-    if (MeshToTransforms.Num() == 0) return nullptr;
+if (MeshToTransforms.Num() == 0) return nullptr;
 
     if (!ContainerActor)
     {
         ContainerActor = World->SpawnActor<AActor>();
+#if WITH_EDITOR
         ContainerActor->SetActorLabel(TEXT("HISMContainer_Converted"));
+#endif
     }
 
     USceneComponent* Root = ContainerActor->GetRootComponent();

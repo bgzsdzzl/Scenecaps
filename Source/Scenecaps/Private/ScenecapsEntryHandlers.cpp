@@ -158,10 +158,12 @@ UObject* FScenecapsBlueprintEntryHandler::ResolveAssetFromActor(AActor* Actor) c
         return nullptr;
     }
 
+#if WITH_EDITOR
     if (UBlueprint* BP = Cast<UBlueprint>(Actor->GetClass()->ClassGeneratedBy))
     {
         return BP;
     }
+#endif
 
     return nullptr;
 }
@@ -201,7 +203,11 @@ UObject* FScenecapsClassEntryHandler::ResolveAssetForStorage(UObject* DroppedObj
 
 UObject* FScenecapsClassEntryHandler::ResolveAssetFromActor(AActor* Actor) const
 {
-    if (Actor && !Cast<UBlueprint>(Actor->GetClass()->ClassGeneratedBy))
+    if (Actor 
+#if WITH_EDITOR
+        && !Cast<UBlueprint>(Actor->GetClass()->ClassGeneratedBy)
+#endif
+    )
     {
         return Actor->GetClass();
     }

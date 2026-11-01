@@ -11,9 +11,11 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Materials/MaterialInterface.h"
+#if WITH_EDITOR
 #include "AssetToolsModule.h"
 #include "IAssetTools.h"
 #include "PackageTools.h"
+#endif
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -89,7 +91,11 @@ void UScenecapsSnapshotRecorder::BuildEntryFromActor(AActor* Actor, FScenecapsEn
     if (!Actor) return;
 
     OutEntry.EntryId = FGuid::NewGuid();
+#if WITH_EDITOR
     OutEntry.DisplayName = Actor->GetActorLabel();
+#else
+    OutEntry.DisplayName = Actor->GetName();
+#endif
     OutEntry.RelativeTransform = Actor->GetActorTransform().GetRelativeTransform(RootTransform);
     OutEntry.bVisible = !Actor->IsHidden();
     OutEntry.bLocked = false;
@@ -146,6 +152,7 @@ UScenecapsAsset* UScenecapsSnapshotRecorder::SnapshotActorsAsSceneAsset(
 {
     if (Actors.Num() == 0) return nullptr;
 
+#if WITH_EDITOR
     UScenecapsAsset* Asset = NewObject<UScenecapsAsset>(Outer ? Outer : GetTransientPackage(), NAME_None, RF_Transactional);
     if (!Asset) return nullptr;
 
@@ -196,6 +203,9 @@ UScenecapsAsset* UScenecapsSnapshotRecorder::SnapshotActorsAsSceneAsset(
     }
 
     return Asset;
+#else
+    return nullptr;
+#endif
 }
 
 UScenecapsAsset* UScenecapsSnapshotRecorder::SnapshotWorldAsSceneAsset(UWorld* World, const FScenecapsSnapshotSettings& Settings)

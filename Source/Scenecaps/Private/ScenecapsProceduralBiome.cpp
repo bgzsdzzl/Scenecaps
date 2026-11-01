@@ -213,7 +213,9 @@ UInstancedStaticMeshComponent* UScenecapsBiomeSamplerComponent::GenerateToISM(
     {
         TargetContainer = World->SpawnActor<AActor>();
         if (!TargetContainer) return nullptr;
+#if WITH_EDITOR
         TargetContainer->SetActorLabel(TEXT("BiomeISMContainer"));
+#endif
         bOwnsContainer = true;
     }
 
@@ -308,7 +310,9 @@ UHierarchicalInstancedStaticMeshComponent* UScenecapsBiomeSamplerComponent::Gene
     {
         TargetContainer = World->SpawnActor<AActor>();
         if (!TargetContainer) return nullptr;
+#if WITH_EDITOR
         TargetContainer->SetActorLabel(TEXT("BiomeHISMContainer"));
+#endif
         bOwnsContainer = true;
     }
 

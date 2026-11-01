@@ -700,10 +700,12 @@ UInstancedStaticMeshComponent* UScenecapsAsset::SpawnCollectionAsISM(UObject* Wo
 
 if (MeshToTransforms.Num() == 0) return nullptr;
 
-// 2. 创建容器 Actor
+    // 2. 创建容器 Actor
     AActor* ContainerActor = World->SpawnActor<AActor>();
     if (!ContainerActor) return nullptr;
+#if WITH_EDITOR
     ContainerActor->SetActorLabel(FString::Printf(TEXT("ScenecapsISMContainer_%s"), *GetName()));
+#endif
 
     // 添加运行时管理组件
     UScenecapsISMComponent* Manager = Cast<UScenecapsISMComponent>(ContainerActor->AddComponentByClass(UScenecapsISMComponent::StaticClass(), false, FTransform::Identity, false));
@@ -799,7 +801,9 @@ if (MeshToTransforms.Num() == 0) return nullptr;
 
 AActor* ContainerActor = World->SpawnActor<AActor>();
     if (!ContainerActor) return nullptr;
+#if WITH_EDITOR
     ContainerActor->SetActorLabel(FString::Printf(TEXT("ScenecapsHISMContainer_%s"), *GetName()));
+#endif
 
     // 添加运行时管理组件
     UScenecapsISMComponent* Manager = Cast<UScenecapsISMComponent>(ContainerActor->AddComponentByClass(UScenecapsISMComponent::StaticClass(), false, FTransform::Identity, false));

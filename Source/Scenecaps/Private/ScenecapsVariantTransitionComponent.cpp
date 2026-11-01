@@ -5,6 +5,7 @@
 #include "ScenecapsActor.h"
 #include "ScenecapsISMComponent.h"
 #include "Engine/World.h"
+#include "Engine/StaticMesh.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -350,7 +351,7 @@ void UScenecapsVariantTransitionComponent::ApplyInterpolationToISM(float Alpha)
         {
             if (BaseEntry.Asset.IsPending()) continue;
             UObject* EntryAsset = BaseEntry.Asset.LoadSynchronous();
-            if (!EntryAsset || EntryAsset != Mesh) continue;
+            if (!EntryAsset || Cast<UStaticMesh>(EntryAsset) != Mesh) continue;
             
             const FScenecapsInterpolatedEntry* InterpEntry = EntryMap.Find(BaseEntry.EntryId);
             if (!InterpEntry) continue;
@@ -399,7 +400,7 @@ void UScenecapsVariantTransitionComponent::ApplyInterpolationToISM(float Alpha)
         {
             if (BaseEntry.Asset.IsPending()) continue;
             UObject* EntryAsset = BaseEntry.Asset.LoadSynchronous();
-            if (!EntryAsset || EntryAsset != Mesh) continue;
+            if (!EntryAsset || Cast<UStaticMesh>(EntryAsset) != Mesh) continue;
             
             const FScenecapsInterpolatedEntry* InterpEntry = EntryMap.Find(BaseEntry.EntryId);
             if (!InterpEntry) continue;

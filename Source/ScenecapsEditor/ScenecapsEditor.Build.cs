@@ -4,7 +4,7 @@ public class ScenecapsEditor : ModuleRules
 {
     public ScenecapsEditor(ReadOnlyTargetRules Target) : base(Target)
     {
-        PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
+        PCHUsage = ModuleRules.PCHUsageMode.NoPCHs;
 
         PublicDependencyModuleNames.AddRange(new string[] 
         { 
@@ -15,7 +15,8 @@ public class ScenecapsEditor : ModuleRules
             "AssetDefinition",
             "AssetRegistry",
             "Slate",
-            "SlateCore"
+            "SlateCore",
+            "Renderer"
         });
 
         PrivateDependencyModuleNames.AddRange(new string[] 

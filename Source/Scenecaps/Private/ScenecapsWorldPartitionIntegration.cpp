@@ -9,7 +9,9 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Engine/Engine.h"
+#if WITH_EDITOR
 #include "Editor.h"
+#endif
 
 UScenecapsWorldPartitionIntegration::UScenecapsWorldPartitionIntegration()
 {
@@ -92,6 +94,7 @@ void UScenecapsWorldPartitionIntegration::AssignDataLayerToActor(
     UDataLayerAsset* DataLayer,
     bool bActivate)
 {
+#if WITH_EDITOR
     if (!Actor || !DataLayer) return;
 
     UWorld* World = Actor->GetWorld();
@@ -109,12 +112,14 @@ void UScenecapsWorldPartitionIntegration::AssignDataLayerToActor(
     {
         Manager->SetDataLayerInstanceRuntimeState(const_cast<UDataLayerInstance*>(Instance), EDataLayerRuntimeState::Activated);
     }
+#endif
 }
 
 void UScenecapsWorldPartitionIntegration::RemoveDataLayerFromActor(
     AActor* Actor,
     UDataLayerAsset* DataLayer)
 {
+#if WITH_EDITOR
     if (!Actor || !DataLayer) return;
 
     UWorld* World = Actor->GetWorld();
@@ -128,6 +133,7 @@ void UScenecapsWorldPartitionIntegration::RemoveDataLayerFromActor(
     {
         Actor->RemoveDataLayer(const_cast<UDataLayerInstance*>(Instance));
     }
+#endif
 }
 
 void UScenecapsWorldPartitionIntegration::SetDataLayerRuntimeState(

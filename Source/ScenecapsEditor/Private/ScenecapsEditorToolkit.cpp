@@ -29,8 +29,8 @@
 #include "Editor.h"
 #include "AssetRegistry/AssetData.h"
 #include "SceneView.h"
-#include "Renderer/SceneViewFamily.h"
 #include "Components/MeshComponent.h"
+#include "Materials/MaterialInterface.h"
 
 #define LOCTEXT_NAMESPACE "Scenecaps"
 

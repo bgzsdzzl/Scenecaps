@@ -33,14 +33,15 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Scene Collection|Variants")
     FName ActiveVariant = NAME_None;
 
-    // ---------- World Partition ----------
-
+// ---------- World Partition ----------
+#if WITH_EDITORONLY_DATA
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Scene Collection|World Partition")
     TSoftObjectPtr<UDataLayerAsset> TargetDataLayer;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Scene Collection|World Partition",
         meta = (EditCondition = "TargetDataLayer != nullptr"))
     bool bSpawnOnDataLayerLoaded = false;
+#endif
 
     // ---------- Modifiers ----------
 
@@ -80,7 +81,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Scene Collection|Variants")
     void SetActiveVariant(FName InVariant, bool bRebuildImmediately = true);
 
-    /** 获取当前 Data Layer 资产 */
+/** 获取当前 Data Layer 资产 */
+#if WITH_EDITOR
     UFUNCTION(BlueprintPure, Category = "Scene Collection|World Partition")
     UDataLayerAsset* GetTargetDataLayer() const;
 
@@ -92,6 +94,11 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Scene Collection|World Partition")
     void SetDataLayerActive(bool bActive);
 
+    /** 获取 Data Layer 状态文本 */
+    UFUNCTION(BlueprintPure, Category = "Scene Collection|World Partition")
+    FText GetDataLayerStatusText() const;
+#endif
+
     /** 获取所有已生成 Actor 的引用（用于运行时进一步操作） */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Scene Collection")
     TArray<AActor*> GetSpawnedActorArray() const;
@@ -99,10 +106,6 @@ public:
     /** 运行时按条件查找/过滤已生成 Actor */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Scene Collection")
     TArray<AActor*> FindSpawnedActorsByClass(TSubclassOf<AActor> ActorClass) const;
-
-    /** 获取 Data Layer 状态文本 */
-    UFUNCTION(BlueprintPure, Category = "Scene Collection|World Partition")
-    FText GetDataLayerStatusText() const;
 
     // ---------- Modifiers API ----------
 
@@ -134,6 +137,7 @@ private:
     UPROPERTY(VisibleAnywhere, Category = "Scene Collection")
     TObjectPtr<USceneComponent> SceneRoot;
 
+#if WITH_EDITORONLY_DATA
     UPROPERTY(Transient)
     TObjectPtr<UDataLayerAsset> CachedDataLayerAsset;
 
@@ -142,4 +146,5 @@ private:
     bool IsTargetDataLayerActive() const;
     void ApplyDataLayerToActor(AActor* Actor, UDataLayerAsset* LayerAsset) const;
     void RemoveDataLayerFromActor(AActor* Actor, UDataLayerAsset* LayerAsset) const;
+#endif
 };

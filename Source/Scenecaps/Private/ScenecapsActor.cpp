@@ -4,11 +4,12 @@
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
 #include "ScenecapsModifierManager.h"
-#include "ScenecapsModifierManager.h"
-#include "GameFramework/Actor.h"
+
+#if WITH_EDITOR
 #include "WorldPartition/DataLayer/DataLayerAsset.h"
 #include "WorldPartition/DataLayer/DataLayerInstance.h"
 #include "WorldPartition/DataLayer/DataLayerManager.h"
+#endif
 
 AScenecapsActor::AScenecapsActor()
 {
@@ -21,6 +22,7 @@ AScenecapsActor::AScenecapsActor()
 }
 
 // ---------- Data Layer helpers ----------
+#if WITH_EDITOR
 
 void AScenecapsActor::EnsureDataLayerCached()
 {
@@ -30,31 +32,7 @@ void AScenecapsActor::EnsureDataLayerCached()
     }
 }
 
-void AScenecapsActor::ApplyDataLayerToActor(AActor* Actor, UDataLayerAsset* LayerAsset) const
-{
-    if (!Actor || !LayerAsset) return;
-    UWorld* World = GetWorld();
-    if (!World) return;
-    UDataLayerManager* Manager = UDataLayerManager::GetDataLayerManager(World);
-    if (!Manager) return;
-    if (const UDataLayerInstance* Instance = Manager->GetDataLayerInstanceFromAsset(LayerAsset))
-    {
-        Actor->AddDataLayer(Instance);
-    }
-}
-
-void AScenecapsActor::RemoveDataLayerFromActor(AActor* Actor, UDataLayerAsset* LayerAsset) const
-{
-    if (!Actor || !LayerAsset) return;
-    UWorld* World = GetWorld();
-    if (!World) return;
-    UDataLayerManager* Manager = UDataLayerManager::GetDataLayerManager(World);
-    if (!Manager) return;
-    if (const UDataLayerInstance* Instance = Manager->GetDataLayerInstanceFromAsset(LayerAsset))
-    {
-        Actor->RemoveDataLayer(Instance);
-    }
-}
+#endif
 
 // ---------- Rebuild / Clear ----------
 
@@ -65,8 +43,10 @@ void AScenecapsActor::Rebuild()
 #endif
 
     Clear();
+#if WITH_EDITOR
     EnsureDataLayerCached();
     if (ShouldDeferRebuild()) return;
+#endif
 
     UScenecapsAsset* Asset = CollectionAsset.LoadSynchronous();
     if (!Asset) return;
@@ -84,7 +64,9 @@ void AScenecapsActor::Rebuild()
     for (AActor* Actor : NewActors)
     {
         if (!Actor) continue;
+#if WITH_EDITOR
         Actor->SetIsSpatiallyLoaded(false);
+#endif
         if (Actor->GetAttachParentActor() == nullptr)
         {
             Actor->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
@@ -92,6 +74,7 @@ void AScenecapsActor::Rebuild()
         SpawnedActors.Add(Actor);
     }
 
+#if WITH_EDITOR
     for (const TPair<FGuid, AActor*>& Pair : EntryToActor)
     {
         AActor* Actor = Pair.Value;
@@ -109,6 +92,7 @@ void AScenecapsActor::Rebuild()
         if (!LayerToUse) LayerToUse = CachedDataLayerAsset;
         if (LayerToUse) ApplyDataLayerToActor(Actor, LayerToUse);
     }
+#endif
 }
 
 void AScenecapsActor::Clear()
@@ -119,6 +103,7 @@ void AScenecapsActor::Clear()
         {
             if (IsValid(Actor))
             {
+#if WITH_EDITOR
                 UDataLayerAsset* LayerToRemove = CachedDataLayerAsset;
                 if (!LayerToRemove && !TargetDataLayer.IsNull())
                 {
@@ -128,6 +113,7 @@ void AScenecapsActor::Clear()
                 {
                     RemoveDataLayerFromActor(Actor, LayerToRemove);
                 }
+#endif
                 Actor->Destroy();
             }
         }
@@ -153,6 +139,7 @@ void AScenecapsActor::PostDuplicate(bool bDuplicateForPIE)
 void AScenecapsActor::BeginPlay()
 {
     Super::BeginPlay();
+#if WITH_EDITOR
     EnsureDataLayerCached();
 
     if (bSpawnOnDataLayerLoaded && !TargetDataLayer.IsNull())
@@ -164,6 +151,7 @@ void AScenecapsActor::BeginPlay()
     {
         Rebuild();
     }
+#endif
 }
 
 void AScenecapsActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -175,6 +163,7 @@ void AScenecapsActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void AScenecapsActor::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+#if WITH_EDITOR
     if (!bSpawnOnDataLayerLoaded || TargetDataLayer.IsNull()) return;
 
     const bool bActive = IsTargetDataLayerActive();
@@ -182,9 +171,10 @@ void AScenecapsActor::Tick(float DeltaSeconds)
 
     if (bActive && !bExists) Rebuild();
     else if (!bActive && bExists) Clear();
+#endif
 }
-
 #if WITH_EDITOR
+
 void AScenecapsActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
     Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -207,6 +197,8 @@ void AScenecapsActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChan
     }
 }
 #endif
+
+#if WITH_EDITOR
 
 // ---------- WP state query ----------
 
@@ -239,8 +231,6 @@ bool AScenecapsActor::ShouldDeferRebuild() const
     return !IsTargetDataLayerActive();
 }
 
-
-
 FText AScenecapsActor::GetDataLayerStatusText() const
 {
     if (TargetDataLayer.IsNull()) return FText::FromString(TEXT("N/A (no Data Layer)"));
@@ -263,7 +253,63 @@ FText AScenecapsActor::GetDataLayerStatusText() const
     }
 }
 
+UDataLayerAsset* AScenecapsActor::GetTargetDataLayer() const
+{
+    return TargetDataLayer.LoadSynchronous();
+}
 
+void AScenecapsActor::SetTargetDataLayer(UDataLayerAsset* InDataLayer, bool bApplyImmediately)
+{
+    if (TargetDataLayer.Get() == InDataLayer) return;
+    TargetDataLayer = InDataLayer;
+    CachedDataLayerAsset = InDataLayer;
+    if (bApplyImmediately) Rebuild();
+}
+
+void AScenecapsActor::SetDataLayerActive(bool bActive)
+{
+    if (!TargetDataLayer.IsNull())
+    {
+        if (UDataLayerManager* Manager = UDataLayerManager::GetDataLayerManager(GetWorld()))
+        {
+            if (UDataLayerAsset* Asset = TargetDataLayer.LoadSynchronous())
+            {
+                if (const UDataLayerInstance* Instance = Manager->GetDataLayerInstanceFromAsset(Asset))
+                {
+                    Manager->SetDataLayerInstanceRuntimeState(const_cast<UDataLayerInstance*>(Instance), bActive ? EDataLayerRuntimeState::Activated : EDataLayerRuntimeState::Unloaded);
+                }
+            }
+        }
+    }
+}
+
+void AScenecapsActor::ApplyDataLayerToActor(AActor* Actor, UDataLayerAsset* LayerAsset) const
+{
+    if (!Actor || !LayerAsset) return;
+    UWorld* World = GetWorld();
+    if (!World) return;
+    UDataLayerManager* Manager = UDataLayerManager::GetDataLayerManager(World);
+    if (!Manager) return;
+    if (const UDataLayerInstance* Instance = Manager->GetDataLayerInstanceFromAsset(LayerAsset))
+    {
+        Actor->AddDataLayer(Instance);
+    }
+}
+
+void AScenecapsActor::RemoveDataLayerFromActor(AActor* Actor, UDataLayerAsset* LayerAsset) const
+{
+    if (!Actor || !LayerAsset) return;
+    UWorld* World = GetWorld();
+    if (!World) return;
+    UDataLayerManager* Manager = UDataLayerManager::GetDataLayerManager(World);
+    if (!Manager) return;
+    if (const UDataLayerInstance* Instance = Manager->GetDataLayerInstanceFromAsset(LayerAsset))
+    {
+        Actor->RemoveDataLayer(Instance);
+    }
+}
+
+#endif
 
 // ---------- Runtime Blueprint API ----------
 
@@ -302,36 +348,6 @@ void AScenecapsActor::SetActiveVariant(FName InVariant, bool bRebuildImmediately
     if (bRebuildImmediately) Rebuild();
 }
 
-UDataLayerAsset* AScenecapsActor::GetTargetDataLayer() const
-{
-    return TargetDataLayer.LoadSynchronous();
-}
-
-void AScenecapsActor::SetTargetDataLayer(UDataLayerAsset* InDataLayer, bool bApplyImmediately)
-{
-    if (TargetDataLayer.Get() == InDataLayer) return;
-    TargetDataLayer = InDataLayer;
-    CachedDataLayerAsset = InDataLayer;
-    if (bApplyImmediately) Rebuild();
-}
-
-void AScenecapsActor::SetDataLayerActive(bool bActive)
-{
-    if (!TargetDataLayer.IsNull())
-    {
-        if (UDataLayerManager* Manager = UDataLayerManager::GetDataLayerManager(GetWorld()))
-        {
-            if (UDataLayerAsset* Asset = TargetDataLayer.LoadSynchronous())
-            {
-                if (const UDataLayerInstance* Instance = Manager->GetDataLayerInstanceFromAsset(Asset))
-                {
-                    Manager->SetDataLayerInstanceRuntimeState(const_cast<UDataLayerInstance*>(Instance), bActive ? EDataLayerRuntimeState::Activated : EDataLayerRuntimeState::Unloaded);
-                }
-            }
-        }
-    }
-}
-
 TArray<AActor*> AScenecapsActor::GetSpawnedActorArray() const
 {
     TArray<AActor*> Result;
@@ -358,8 +374,6 @@ TArray<AActor*> AScenecapsActor::FindSpawnedActorsByClass(TSubclassOf<AActor> Ac
     return Result;
 }
 
-// ---- Modifier System ----
-
 UScenecapsModifierManager* AScenecapsActor::GetOrCreateModifierManager()
 {
     if (!ModifierManager)
@@ -385,4 +399,3 @@ void AScenecapsActor::ApplyModifiersToActor(AActor* Actor, FName VariantName)
         Mgr->ExecuteModifiersOnActor(Actor, CollectionAsset.LoadSynchronous(), VariantName);
     }
 }
-
