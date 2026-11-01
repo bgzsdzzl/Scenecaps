@@ -626,7 +626,9 @@ static void SetupISMForLumen(UInstancedStaticMeshComponent* ISM, const FScenecap
     ISM->SetLightingChannels(true, false, false);     // Static Lighting 通道 (Channel 0 for default lights)
 
     // 碰撞/导航 - 从 Context 读取，缺省保持硬编码值
-    ECollisionEnabled CollisionEnabled = Context.bOverrideCollision ? Context.CollisionEnabled : ECollisionEnabled::QueryAndPhysics;
+    ECollisionEnabled::Type CollisionEnabled = Context.bOverrideCollision
+        ? Context.CollisionEnabled.GetValue()
+        : ECollisionEnabled::QueryAndPhysics;
     ISM->SetCollisionEnabled(CollisionEnabled);
     ISM->SetGenerateOverlapEvents(false);
     ISM->SetCanEverAffectNavigation(false);
@@ -645,7 +647,9 @@ static void SetupHISMForLumen(UHierarchicalInstancedStaticMeshComponent* HISM, c
     HISM->SetCastShadow(true);
     HISM->SetLightingChannels(true, false, false);
 
-    ECollisionEnabled CollisionEnabled = Context.bOverrideCollision ? Context.CollisionEnabled : ECollisionEnabled::QueryAndPhysics;
+    ECollisionEnabled::Type CollisionEnabled = Context.bOverrideCollision
+        ? Context.CollisionEnabled.GetValue()
+        : ECollisionEnabled::QueryAndPhysics;
     HISM->SetCollisionEnabled(CollisionEnabled);
     HISM->SetGenerateOverlapEvents(false);
     HISM->SetCanEverAffectNavigation(false);
@@ -834,6 +838,8 @@ AActor* ContainerActor = World->SpawnActor<AActor>();
             }
         }
 
+        // 使用第一个 Context（如果有）配置 HISM 级别的设置
+        const FScenecapsSpawnContext* FirstCtx = (Contexts && Contexts->Num() > 0) ? &(*Contexts)[0] : nullptr;
         SetupHISMForLumen(HISM, FirstCtx ? *FirstCtx : FScenecapsSpawnContext());
 
         // 强制重建 HISM 层级树（用于视锥剔除和 LOD 选择）

@@ -2,6 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "IDetailCustomization.h"
+#include "Framework/Commands/UIAction.h"
+#include "UObject/WeakObjectPtr.h"
+#include "UObject/ObjectPtr.h"
+#include "InputCoreTypes.h"
 
 class AScenecapsActor;
 

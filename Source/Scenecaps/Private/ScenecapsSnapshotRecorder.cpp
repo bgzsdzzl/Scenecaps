@@ -7,6 +7,7 @@
 #include "GameFramework/Actor.h"
 #include "Engine/Engine.h"
 #include "Engine/StaticMeshActor.h"
+#include "Engine/StaticMesh.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Materials/MaterialInterface.h"
@@ -93,11 +94,11 @@ void UScenecapsSnapshotRecorder::BuildEntryFromActor(AActor* Actor, FScenecapsEn
     OutEntry.bVisible = !Actor->IsHidden();
     OutEntry.bLocked = false;
 
-    TArray<UStaticMeshComponent*> MeshComps;
+TArray<UStaticMeshComponent*> MeshComps;
     Actor->GetComponents<UStaticMeshComponent>(MeshComps);
     if (MeshComps.Num() > 0 && MeshComps[0]->GetStaticMesh())
     {
-        OutEntry.Asset = MeshComps[0]->GetStaticMesh();
+        OutEntry.Asset = Cast<UObject>(MeshComps[0]->GetStaticMesh());
     }
 
     if (MeshComps.Num() > 0)

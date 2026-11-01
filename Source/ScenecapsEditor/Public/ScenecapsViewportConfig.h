@@ -51,19 +51,19 @@ struct FScenecapsCameraBookmark
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "CameraBookmark")
     FName Name;
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "CameraBookmark")
     FVector Location = FVector::ZeroVector;
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "CameraBookmark")
     FRotator Rotation = FRotator::ZeroRotator;
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "CameraBookmark")
     float OrthoZoom = 1.0f;
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "CameraBookmark")
     bool bIsOrthographic = false;
 };
 
@@ -73,13 +73,13 @@ struct FScenecapsViewportToolbarButton
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "ToolbarButton")
     FName ActionName;
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "ToolbarButton")
     FText Label;
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "ToolbarButton")
     FText ToolTip;
 
     // FSlateIcon and FUIAction are not USTRUCTs, so they can't be UPROPERTY
@@ -105,19 +105,19 @@ struct FScenecapsViewportOverlayConfig
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "Overlay")
     EScenecapsViewportOverlayType Type = EScenecapsViewportOverlayType::None;
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "Overlay")
     bool bEnabled = true;
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "Overlay")
     FLinearColor Color = FLinearColor::White;
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "Overlay")
     float Scale = 1.0f;
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "Overlay")
     TMap<FName, FString> CustomParams;
 };
 
@@ -127,16 +127,16 @@ struct FScenecapsViewportLayoutSection
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "Layout")
     FName SectionName;
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "Layout")
     TArray<FName> TabIds;
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "Layout")
     float SizeCoefficient = 1.0f;
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "Layout")
     TEnumAsByte<EOrientation> Orientation = Orient_Horizontal;
 };
 

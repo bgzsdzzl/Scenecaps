@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "Components/ActorComponent.h"
 #include "ScenecapsProceduralTypes.h"
 #include "ScenecapsProceduralBiome.generated.h"
 

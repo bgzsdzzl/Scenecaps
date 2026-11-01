@@ -6,7 +6,7 @@ public class ScenecapsEditor : ModuleRules
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
-PublicDependencyModuleNames.AddRange(new string[] 
+        PublicDependencyModuleNames.AddRange(new string[] 
         { 
             "Core",
             "CoreUObject",

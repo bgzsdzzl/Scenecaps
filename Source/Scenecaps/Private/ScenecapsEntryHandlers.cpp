@@ -19,6 +19,7 @@
 #include "Sound/SoundBase.h"
 #include "ScenecapsAsset.h"
 #include "ScenecapsActor.h"
+#include "MaterialDomain.h"
 
 #if SCENE_COLLECTION_WITH_NIAGARA
 #include "NiagaraSystem.h"

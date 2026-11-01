@@ -202,7 +202,7 @@ void UScenecapsVariantTransitionComponent::ApplyInterpolationToAsset(float Alpha
     }
 
     // 遍历生成的 Actor 并应用插值
-    for (const TObjectPtr<AActor>& ActorPtr : SceneActor->SpawnedActors)
+    for (const TObjectPtr<AActor>& ActorPtr : SceneActor->GetSpawnedActors())
     {
         AActor* Actor = ActorPtr.Get();
         if (!Actor || !IsValid(Actor)) continue;
@@ -350,7 +350,7 @@ void UScenecapsVariantTransitionComponent::ApplyInterpolationToISM(float Alpha)
         {
             if (BaseEntry.Asset.IsPending()) continue;
             UObject* EntryAsset = BaseEntry.Asset.LoadSynchronous();
-            if (EntryAsset != Mesh) continue;
+            if (!EntryAsset || EntryAsset != Mesh) continue;
             
             const FScenecapsInterpolatedEntry* InterpEntry = EntryMap.Find(BaseEntry.EntryId);
             if (!InterpEntry) continue;
@@ -399,7 +399,7 @@ void UScenecapsVariantTransitionComponent::ApplyInterpolationToISM(float Alpha)
         {
             if (BaseEntry.Asset.IsPending()) continue;
             UObject* EntryAsset = BaseEntry.Asset.LoadSynchronous();
-            if (EntryAsset != Mesh) continue;
+            if (!EntryAsset || EntryAsset != Mesh) continue;
             
             const FScenecapsInterpolatedEntry* InterpEntry = EntryMap.Find(BaseEntry.EntryId);
             if (!InterpEntry) continue;
