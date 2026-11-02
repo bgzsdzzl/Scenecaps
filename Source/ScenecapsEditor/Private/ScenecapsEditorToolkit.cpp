@@ -8,11 +8,12 @@
 #include "ScenecapsEditorModule.h"
 #include "ScenecapsLocalization.h"
 
-#include "DragAndDrop/AssetDragDropOp.h"
-#include "Engine/World.h"
 #include "Components/PointLightComponent.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/SkyLightComponent.h"
+#include "Components/SkyAtmosphereComponent.h"
+#include "Engine/SkyLight.h"
+#include "Engine/DirectionalLight.h"
 #include "EngineUtils.h"
 #include "Framework/Docking/TabManager.h"
 #include "GameFramework/Actor.h"
@@ -61,7 +62,7 @@ void FScenecapsEditorToolkit::InitEditor(const EToolkitMode::Type Mode,
     PreviewScene->SetLightDirection(FRotator(-45.f, -30.f, 0.f));
     PreviewScene->SetLightColor(FColor::White);
 
-    // Disable all global lighting - no sky, no directional light, no sky light
+    // Disable all global lighting - no sky, no directional light, no sky light, no sky atmosphere
     if (UWorld* World = PreviewScene->GetWorld())
     {
         // Disable Sky Light completely
@@ -77,6 +78,16 @@ void FScenecapsEditorToolkit::InitEditor(const EToolkitMode::Type Mode,
             LightComp->SetIntensity(0.0f);
             LightComp->SetVisibility(false);
         }
+
+// Disable Sky Atmosphere if any
+    for (TActorIterator<AActor> It(World); It; ++It)
+    {
+        AActor* Actor = *It;
+        if (Actor && (Actor->IsA(ASkyLight::StaticClass()) || Actor->IsA(ADirectionalLight::StaticClass()) || Actor->IsA(ASkyAtmosphere::StaticClass())))
+        {
+            Actor->Destroy();
+        }
+    }
     }
 
     const TSharedRef<FTabManager::FLayout> Layout =
