@@ -53,7 +53,7 @@ void FScenecapsEditorToolkit::InitEditor(const EToolkitMode::Type Mode,
         CachedEditorViewRotation = SavedRot;
     }
 
-    FPreviewScene::ConstructionValues CVS;
+FPreviewScene::ConstructionValues CVS;
     CVS.bAllowAudioPlayback = false;
     CVS.bCreatePhysicsScene = true;
     CVS.LightBrightness = 0.0f;
@@ -62,7 +62,7 @@ void FScenecapsEditorToolkit::InitEditor(const EToolkitMode::Type Mode,
     PreviewScene->SetLightDirection(FRotator(-45.f, -30.f, 0.f));
     PreviewScene->SetLightColor(FColor::White);
 
-    // Disable all global lighting - no sky, no directional light, no sky light, no sky atmosphere
+    // Aggressively disable all global lighting - no sky, no directional light, no sky light, no sky atmosphere
     if (UWorld* World = PreviewScene->GetWorld())
     {
         // Disable Sky Light completely
@@ -79,15 +79,15 @@ void FScenecapsEditorToolkit::InitEditor(const EToolkitMode::Type Mode,
             LightComp->SetVisibility(false);
         }
 
-// Disable Sky Atmosphere if any
-    for (TActorIterator<AActor> It(World); It; ++It)
-    {
-        AActor* Actor = *It;
-        if (Actor && (Actor->IsA(ASkyLight::StaticClass()) || Actor->IsA(ADirectionalLight::StaticClass()) || Actor->IsA(ASkyAtmosphere::StaticClass())))
+        // Disable Sky Atmosphere if any
+        for (TActorIterator<AActor> It(World); It; ++It)
         {
-            Actor->Destroy();
+            AActor* Actor = *It;
+            if (Actor && (Actor->IsA(ASkyLight::StaticClass()) || Actor->IsA(ADirectionalLight::StaticClass()) || Actor->IsA(ASkyAtmosphere::StaticClass())))
+            {
+                Actor->Destroy();
+            }
         }
-    }
     }
 
     const TSharedRef<FTabManager::FLayout> Layout =
@@ -352,8 +352,8 @@ AActor* FScenecapsEditorToolkit::SpawnPreviewEntry(const FScenecapsEditorEntryVi
         PointLight->RegisterComponent();
         PointLight->AttachToComponent(Actor->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
         PointLight->SetRelativeLocation(FVector(0, 0, 50));
-        PointLight->SetIntensity(500.0f);
-        PointLight->SetAttenuationRadius(500.0f);
+        PointLight->SetIntensity(150.0f);
+        PointLight->SetAttenuationRadius(300.0f);
         PointLight->SetLightColor(FLinearColor(1.0f, 0.95f, 0.9f));
         PointLight->SetSourceRadius(10.0f);
         PointLight->SetSoftSourceRadius(5.0f);

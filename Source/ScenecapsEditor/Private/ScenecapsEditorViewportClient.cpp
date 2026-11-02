@@ -28,6 +28,11 @@ FScenecapsEditorViewportClient::FScenecapsEditorViewportClient(
 
     SetRealtime(false);
 
+    // Disable sky/atmosphere rendering in the viewport
+    EngineShowFlags.SetSkyLighting(false);
+
+    SetRealtime(false);
+
     // Frame the default scene bounds (like old version)
     FocusViewportOnBox(FBox(FVector(-100.f), FVector(100.f)));
 }
