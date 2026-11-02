@@ -56,6 +56,7 @@ void FScenecapsEditorToolkit::InitEditor(const EToolkitMode::Type Mode,
 FPreviewScene::ConstructionValues CVS;
     CVS.bAllowAudioPlayback = false;
     CVS.bCreatePhysicsScene = true;
+    CVS.bDefaultLighting = false;  // Disable default lighting completely
     CVS.LightBrightness = 0.0f;
     CVS.SkyBrightness = 0.0f;
     PreviewScene = MakeUnique<FPreviewScene>(CVS);
