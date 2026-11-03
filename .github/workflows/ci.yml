@@ -14,7 +14,7 @@ jobs:
   # │ 1. 构建验证 - 源码结构 + 引用完整性 + 模块规范                  │
   # └─────────────────────────────────────────────────────────────┘
   build-validation:
-    name: 🔨 Build Validation
+    name: Build Validation
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
@@ -22,7 +22,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: 📦 Verify Module Structure
+      - name: Verify Module Structure
         shell: pwsh
         run: |
           $errors = @()
@@ -57,7 +57,7 @@ jobs:
           }
           Write-Host "✅ Module structure valid (Engine 5.8, all modules present)"
 
-      - name: 🔍 Verify Build.cs Dependencies
+      - name: Verify Build.cs Dependencies
         shell: pwsh
         run: |
           $errors = @()
@@ -79,7 +79,7 @@ jobs:
           }
           Write-Host "✅ All Build.cs files valid"
 
-      - name: 🔍 Verify Public API Export Macros
+      - name: Verify Public API Export Macros
         shell: pwsh
         run: |
           # Public/ 头文件中的 UCLASS/USTRUCT 必须带 SCENECAPS_API
@@ -100,7 +100,7 @@ jobs:
             Write-Host "✅ All public types export SCENECAPS_API"
           }
 
-      - name: 🔍 Verify WITH_EDITOR Usage
+      - name: Verify WITH_EDITOR Usage
         shell: pwsh
         run: |
           # 检查常见的编辑器专用 API 是否被 WITH_EDITOR 包裹
@@ -139,13 +139,13 @@ jobs:
   # │ 2. Include 可用性 - 头文件存在于 UE 5.8 或本项目                │
   # └─────────────────────────────────────────────────────────────┘
   include-check:
-    name: 📑 Include Check (UE 5.8)
+    name: Include Check (UE 5.8)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
-      - name: 📑 Verify All Includes Resolve (UE 5.8 headers manifest)
+      - name: Verify All Includes Resolve (UE 5.8 headers manifest)
         shell: pwsh
         run: |
           $manifest = ".github/ue58-headers.txt"
@@ -208,13 +208,13 @@ jobs:
   # │ 3. 代码质量 - 文档/规范                                       │
   # └─────────────────────────────────────────────────────────────┘
   code-quality:
-    name: ✨ Code Quality
+    name: Code Quality
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
-      - name: 📝 Markdown Lint
+      - name: Markdown Lint
         uses: DavidAnson/markdownlint-cli2-action@v17
         with:
           globs: |
@@ -225,7 +225,7 @@ jobs:
             docs/*.md
         continue-on-error: true
 
-      - name: 📝 Verify Docs Links
+      - name: Verify Docs Links
         shell: pwsh
         run: |
           # 验证文档中的相对链接指向存在的文件
@@ -249,7 +249,7 @@ jobs:
           }
           Write-Host "✅ All documentation links valid"
 
-      - name: 📝 Conventional Commits (PR title check)
+      - name: Conventional Commits (PR title check)
         if: github.event_name == 'pull_request'
         shell: pwsh
         run: |
@@ -264,7 +264,7 @@ jobs:
   # │ 4. 安全 - Secret 扫描 + 依赖审查                               │
   # └─────────────────────────────────────────────────────────────┘
   security:
-    name: 🔒 Security
+    name: Security
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -275,7 +275,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 🔒 Scan for Secrets & Credentials
+      - name: Scan for Secrets & Credentials
         shell: pwsh
         run: |
           # 扫描源文件中意外提交的密钥/令牌/密码
@@ -305,7 +305,7 @@ jobs:
           }
           Write-Host "✅ No secrets detected in $($files.Count) files"
 
-      - name: 🔒 Dependency Review
+      - name: Dependency Review
         if: github.event_name == 'pull_request'
         uses: actions/dependency-review-action@v4
 
@@ -313,12 +313,12 @@ jobs:
   # │ 5. 汇总状态 (README badge 用)                                 │
   # └─────────────────────────────────────────────────────────────┘
   status:
-    name: ✅ CI Status
+    name: CI Status
     needs: [build-validation, include-check, code-quality, security]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: 📊 Check Results
+      - name: Check Results
         run: |
           echo "build-validation: ${{ needs.build-validation.result }}"
           echo "include-check: ${{ needs.include-check.result }}"
