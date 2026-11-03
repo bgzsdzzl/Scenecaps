@@ -9,8 +9,9 @@
 
 ## [未发布]
 
-### 新增
+### 新增 (未发布)
 - 编辑器预览视口：每物体点光源（无全局天空/大气）
+
 - 变体过渡系统：支持插值
 - 生物群系程序化生成（网格、泊松圆盘、噪声聚类、径向）
 - Data Layer 集成（World Partition）
@@ -22,12 +23,14 @@
 
 ### 变更
 - 编辑器预览：完全移除天空/大气/全局光
+
 - 编辑器预览：每物体点光源（强度 150、半径 300）
 - CVS.bDefaultLighting = false 彻底禁用默认光照
 - 禁用 SkyLight、DirectionalLight、清理 SkyAtmosphere
 
 ### 修复
 - 编辑器预览光照过亮（默认光照导致）
+
 - 变体过渡 ApplyInterpolationToAsset/ISM 实现
 - BiomeSampler GenerateToISM/HISM 实现
 - DataLayer 代码用 WITH_EDITOR 包裹（Game 目标编译通过）
@@ -36,12 +39,14 @@
 ### 移除
 - 编辑器预览中的全局 SkyLight、DirectionalLight、SkyAtmosphere
 
+
 ---
 
 ## [1.0.0] - 2024-XX-XX
 
 ### 新增
 - 首个发布版本
+
 - 场景集合资产系统
 - 变体系统（稀疏覆盖）
 - ISM/HISM 批量生成

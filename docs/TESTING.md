@@ -124,14 +124,19 @@
 
 ```bash
 # Editor Development
+
 RunUAT.bat BuildPlugin -Plugin=... -TargetPlatforms=Win64 -TargetConfigurations=Development -Build=UnrealEditor
+
 
 # Game Development
 ... -Build=UnrealGame -TargetConfigurations=Development
 
+
 # Game Shipping
 ... -Build=UnrealGame -TargetConfigurations=Shipping
+
 ```
+
 
 ### 静态分析
 
@@ -142,9 +147,12 @@ RunUAT.bat BuildPlugin -Plugin=... -TargetPlatforms=Win64 -TargetConfigurations=
 
 ```bash
 # 编辑器中
+
 obj list class=Scenecaps
+
 obj refs class=ScenecapsActor
 ```
+
 
 - 无内存泄漏（退出时对象计数归零）
 - 无 GC 引用循环

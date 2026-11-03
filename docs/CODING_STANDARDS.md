@@ -29,8 +29,9 @@
 
 ## 文件组织
 
-```
+```text
 Source/
+
 ├── Scenecaps/                 # Runtime 模块
 │   ├── Public/                # 公开 API (SCENECAPS_API)
 │   │   ├── ScenecapsAsset.h
@@ -43,6 +44,7 @@ Source/
 │   └── Private/
 └── ThirdParty/                # 第三方依赖（如有）
 ```
+
 
 - 公开 API 头文件放在 `Public/`，标记 `SCENECAPS_API`
 - 私有实现放在 `Private/`
@@ -96,6 +98,7 @@ Source/
 
 ```cpp
 // 类
+
 UCLASS(BlueprintType, Blueprintable, meta = (DisplayName = "Scenecaps Asset"))
 class SCENECAPS_API UScenecapsAsset : public UPrimaryDataAsset
 {
@@ -125,10 +128,12 @@ enum class EScenecapsModifierPhase : uint8
 };
 ```
 
+
 ### 属性规范
 
 ```cpp
 // 基础属性
+
 UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scene Collection")
 TSoftObjectPtr<UScenecapsAsset> CollectionAsset;
 
@@ -149,10 +154,12 @@ UPROPERTY(EditAnywhere, Category = "World Partition")
 TSoftObjectPtr<UDataLayerAsset> TargetDataLayer;
 ```
 
+
 ### 函数规范
 
 ```cpp
 // Blueprint 可调用
+
 UFUNCTION(BlueprintCallable, Category = "Scenecaps|Scene")
 void SetActiveVariant(FName InVariant, bool bRebuildImmediately = true);
 
@@ -165,6 +172,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnVariantChanged, FName, NewVariant
 UPROPERTY(BlueprintAssignable, Category = "Scenecaps|Events")
 FOnVariantChanged OnVariantChanged;
 ```
+
 
 ---
 
@@ -179,6 +187,7 @@ FOnVariantChanged OnVariantChanged;
 
 ```cpp
 void AScenecapsActor::Rebuild()
+
 {
 #if WITH_EDITOR
     Modify();
@@ -201,22 +210,29 @@ void AScenecapsActor::Rebuild()
 }
 ```
 
+
 ### 注释规范
 
 ```cpp
 /**
+
  * 重新构建场景集合
+
  * 会清除现有 Actor 并根据当前变体重新生成
  */
+
 void Rebuild();
 
 /**
  * 获取当前激活的变体名称
+
  * @return 当前激活的变体名，NAME_None 表示基础状态
  */
+
 UFUNCTION(BlueprintPure, Category = "Scenecaps|Variants")
 FName GetActiveVariant() const;
 ```
+
 
 - 公开 API 必须有文档注释
 - 复杂逻辑添加行内注释

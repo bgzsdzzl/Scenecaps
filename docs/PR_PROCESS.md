@@ -23,13 +23,15 @@
 
 ### 分支命名
 
-```
+```text
 feature/short-description    # 新功能
+
 fix/short-description        # 缺陷修复
 docs/short-description       # 文档更新
 refactor/short-description   # 代码重构
 test/short-description       # 测试相关
 ```
+
 
 示例：
 - `feature/biome-radial-distribution`
@@ -42,13 +44,15 @@ test/short-description       # 测试相关
 
 遵循 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/v1.0.0/)：
 
-```
+```text
 <type>[optional scope]: <description>
+
 
 [optional body]
 
 [optional footer(s)]
 ```
+
 
 **类型：**
 - `feat` - 新功能
@@ -61,8 +65,10 @@ test/short-description       # 测试相关
 - `revert` - 回滚
 
 **示例：**
-```
+
+```text
 feat(editor): add per-object point lights to preview viewport
+
 
 Disable default lighting and add per-object point lights
 to avoid overbright preview.
@@ -70,14 +76,17 @@ to avoid overbright preview.
 Closes #123
 ```
 
-```
+
+```text
 fix(runtime): disable default lighting in preview scene
+
 
 Set CVS.bDefaultLighting = false to prevent overbright
 preview caused by default sky/atmosphere lighting.
 
 Fixes #456
 ```
+
 
 ---
 
@@ -99,7 +108,9 @@ Fixes #456
 
 ```markdown
 ## 变更类型
+
 - [ ] feat: 新功能
+
 - [ ] fix: 缺陷修复
 - [ ] refactor: 重构
 - [ ] docs: 文档更新
@@ -109,12 +120,15 @@ Fixes #456
 ## 变更描述
 <!-- 简述变更内容与动机 -->
 
+
 ## 相关 Issue
 Closes #123
+
 Relates to #456
 
 ## 测试验证
 - [ ] Editor (Development) 编译通过
+
 - [ ] Game (Development) 编译通过
 - [ ] Game (Shipping) 编译通过
 - [ ] 相关功能手动测试通过
@@ -123,18 +137,22 @@ Relates to #456
 ## 截图/视频 (如适用)
 <!-- UI/渲染变更请附截图或视频 -->
 
+
 ## 影响范围
 - [ ] Runtime 模块
+
 - [ ] Editor 模块
 - [ ] 公开 API 变更
 - [ ] 配置/数据格式变更
 - [ ] 文档需同步更新
 ```
 
+
 ### 3. 代码审核
 
 #### 审核者职责
 - 代码逻辑正确性
+
 - 符合 [CODING_STANDARDS.md](CODING_STANDARDS.md)
 - 无明显性能/内存问题
 - 测试覆盖充分
@@ -142,7 +160,9 @@ Relates to #456
 
 #### 审核流程
 1. 自动 CI 检查通过
+
 - [ ] Editor (Development) 编译
+
 - [ ] Game (Development) 编译
 - [ ] Game (Shipping) 编译
 - [ ] 无新增编译警告
@@ -180,16 +200,19 @@ Relates to #456
 
 1. **准备**：
    - 创建 `release/v1.x.x` 分支
+
    - 更新 `Scenecaps.uplugin` 版本号
    - 更新 `CHANGELOG.md`
 
 2. **验证**：
    - 全配置构建通过
+
    - 核心功能冒烟测试
    - 打包 Shipping 配置验证
 
 3. **发布**：
    - `git tag v1.x.x`
+
    - `git push origin v1.x.x`
    - GitHub Actions 自动创建 Release、上传产物
    - 更新 `CHANGELOG.md` 最终版本
@@ -210,13 +233,17 @@ Relates to #456
 
 ```bash
 # 回滚合并提交
+
 git revert <merge-commit-sha> -m 1
+
 git push origin main
 
 # 或回滚到指定标签
 git checkout v1.2.3
+
 git push origin main --force-with-lease
 ```
+
 
 ---
 
@@ -225,22 +252,30 @@ git push origin main --force-with-lease
 ### Q: PR 被 Request Changes 怎么办？
 A: 根据反馈修改，推送新提交到同一分支，PR 自动更新，请审核者再次审核。
 
+
 ### Q: CI 失败但本地通过？
 A: 检查环境差异（UE 版本、插件版本、依赖模块），补充缺失依赖或修复平台差异。
 
+
 ### Q: 如何解决合并冲突？
 ```bash
+
 git checkout feature/your-branch
+
 git fetch origin
 git rebase origin/develop  # 或 merge
 # 解决冲突
+
 git add .
+
 git rebase --continue
 git push -f origin feature/your-branch
 ```
 
+
 ### Q: 如何撤销已合并的 PR？
 A: `git revert <merge-commit-sha> -m 1` 创建反向提交，再次 PR 合并。
+
 
 ---
 
