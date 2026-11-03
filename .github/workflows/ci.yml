@@ -135,7 +135,73 @@ jobs:
           }
 
   # ┌─────────────────────────────────────────────────────────────┐
-  # │ 2. 代码质量 - 文档/规范                                       │
+  # │ 2. Include 可用性 - 头文件存在于 UE 5.8 或本项目                │
+  # └─────────────────────────────────────────────────────────────┘
+  include-check:
+    name: 📑 Include Check (UE 5.8)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 📑 Verify All Includes Resolve (UE 5.8 headers manifest)
+        shell: pwsh
+        run: |
+          $manifest = ".github/ue58-headers.txt"
+          if (-not (Test-Path $manifest)) {
+            Write-Error "Missing UE 5.8 header manifest: $manifest"
+            exit 1
+          }
+
+          # 已知 UE 5.8 头文件集合（引擎 + 插件 Public/Classes）
+          $known = @{}
+          Get-Content $manifest | ForEach-Object {
+            $line = $_.Trim()
+            if ($line -and -not $line.StartsWith("#")) { $known[$line] = $true }
+          }
+          Write-Host "Loaded $($known.Count) known UE 5.8 headers"
+
+          # 本项目自己的头文件（相对模块根目录，即 include 的解析方式）
+          foreach ($header in Get-ChildItem "Source" -Recurse -Include "*.h","*.hpp") {
+            $full = $header.FullName -replace '\\', '/'
+            if ($full -match '/Source/([^/]+)/(.+)$') {
+              $known["$($Matches[2])"] = $true
+              $known["$($Matches[1])/$($Matches[2])"] = $true
+            }
+          }
+          # Build.cs、generated.h 等动态文件
+          $known["*.generated.h"] = $true
+          Write-Host "Total known headers (incl. project): $($known.Count)"
+
+          # 扫描所有 #include "..."（尖括号 include 是系统头，跳过）
+          $errors = @()
+          $checked = 0
+          foreach ($src in Get-ChildItem "Source" -Recurse -Include "*.h","*.hpp","*.cpp") {
+            $lineNo = 0
+            foreach ($line in Get-Content $src.FullName) {
+              $lineNo++
+              if ($line -match '^\s*#include\s+"([^"]+)"') {
+                $inc = $Matches[1]
+                $checked++
+                # generated.h 由 UHT 生成，跳过
+                if ($inc -match '\.generated\.h$') { continue }
+                if (-not $known.ContainsKey($inc)) {
+                  $errors += "$($src.FullName.Replace((Get-Location).Path + '\', '')):$($lineNo): include not found in UE 5.8 or project: `"$inc`""
+                }
+              }
+            }
+          }
+
+          Write-Host "Checked $checked includes"
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_ }
+            Write-Error "Found $($errors.Count) unresolvable include(s)"
+            exit 1
+          }
+          Write-Host "✅ All $checked includes resolve in UE 5.8 / project headers"
+
+  # ┌─────────────────────────────────────────────────────────────┐
+  # │ 3. 代码质量 - 文档/规范                                       │
   # └─────────────────────────────────────────────────────────────┘
   code-quality:
     name: ✨ Code Quality
@@ -166,11 +232,7 @@ jobs:
             $linkMatches = [regex]::Matches($content, '\[[^\]]+\]\((?!http)([^)#\s]+)(?:#[^)]*)?\)')
             foreach ($m in $linkMatches) {
               $linkPath = $m.Groups[1].Value
-              if ($linkPath -match "^\.\./") {
-                $resolved = Join-Path (Split-Path $doc.FullName) $linkPath
-              } else {
-                $resolved = Join-Path (Split-Path $doc.FullName) $linkPath
-              }
+              $resolved = Join-Path (Split-Path $doc.FullName) $linkPath
               $resolved = [System.IO.Path]::GetFullPath($resolved)
               if (-not (Test-Path $resolved)) {
                 $errors += "$($doc.Name): broken link '$linkPath'"
@@ -195,7 +257,7 @@ jobs:
           Write-Host "✅ PR title follows conventional commits"
 
   # ┌─────────────────────────────────────────────────────────────┐
-  # │ 3. 安全 - CodeQL + 依赖审查                                   │
+  # │ 4. 安全 - CodeQL + 依赖审查                                   │
   # └─────────────────────────────────────────────────────────────┘
   security:
     name: 🔒 Security
@@ -222,20 +284,22 @@ jobs:
         uses: actions/dependency-review-action@v4
 
   # ┌─────────────────────────────────────────────────────────────┐
-  # │ 4. 汇总状态 (README badge 用)                                 │
+  # │ 5. 汇总状态 (README badge 用)                                 │
   # └─────────────────────────────────────────────────────────────┘
   status:
     name: ✅ CI Status
-    needs: [build-validation, code-quality, security]
+    needs: [build-validation, include-check, code-quality, security]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: 📊 Check Results
         run: |
           echo "build-validation: ${{ needs.build-validation.result }}"
+          echo "include-check: ${{ needs.include-check.result }}"
           echo "code-quality: ${{ needs.code-quality.result }}"
           echo "security: ${{ needs.security.result }}"
           if [[ "${{ needs.build-validation.result }}" != "success" ]] ||
+             [[ "${{ needs.include-check.result }}" != "success" ]] ||
              [[ "${{ needs.code-quality.result }}" != "success" ]] ||
              [[ "${{ needs.security.result }}" != "success" ]]; then
             echo "❌ One or more checks failed"

@@ -7,4 +7,4 @@
 #include "EditorStyle.h"
 #include "SlateCore.h"
 #include "Slate.h"
-#include "ScenecapsEditor.h"
+#include "ScenecapsEditorModule.h"
