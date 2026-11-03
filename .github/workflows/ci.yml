@@ -310,11 +310,85 @@ jobs:
         uses: actions/dependency-review-action@v4
 
   # ┌─────────────────────────────────────────────────────────────┐
-  # │ 5. 汇总状态 (README badge 用)                                 │
+  # │ 4.5. 代码重构建议 - Sourcery (开源项目免费)                    │
+  # └─────────────────────────────────────────────────────────────┘
+  sourcery:
+    name: Sourcery Code Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Sourcery
+        uses: sourcery-ai/sourcery-action@v1
+        with:
+          api-key: ${{ secrets.SOURCERY_API_KEY }}
+
+  # ┌─────────────────────────────────────────────────────────────┐
+  # │ 5. 项目结构检查 - 动态基于 .uplugin，不写死具体文件            │
+  # └─────────────────────────────────────────────────────────────┘
+  project-structure:
+    name: Project Structure Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Dynamic Project Structure
+        shell: pwsh
+        run: |
+          $errors = @()
+
+          # 查找根目录 .uplugin 文件
+          $upluginFiles = Get-ChildItem -Filter "*.uplugin"
+          if ($upluginFiles.Count -eq 0) {
+            Write-Error "No .uplugin file found in repository root"
+            exit 1
+          }
+          $upluginPath = $upluginFiles[0].FullName
+          $uplugin = Get-Content $upluginPath -Raw | ConvertFrom-Json
+
+          # 必要的顶层文件（后缀匹配，不写死具体文件名）
+          $requiredRootExtensions = @(".uplugin")
+          foreach ($ext in $requiredRootExtensions) {
+            if (-not (Get-ChildItem -Filter "*$ext")) {
+              $errors += "Missing root file: *$ext"
+            }
+          }
+
+          # 动态检查：uplugin 声明的每个模块都必须有对应的 Build.cs
+          foreach ($module in $uplugin.Modules) {
+            $buildCs = "Source/$($module.Name)/$($module.Name).Build.cs"
+            if (-not (Test-Path $buildCs)) {
+              $errors += "Module '$($module.Name)' declared in uplugin but missing $buildCs"
+            }
+          }
+
+          # 动态检查：Source/ 下的每个子目录都应在 uplugin 中声明为模块
+          $declaredModules = @($uplugin.Modules | ForEach-Object { $_.Name })
+          $sourceDirs = Get-ChildItem "Source" -Directory | ForEach-Object { $_.Name }
+          foreach ($dir in $sourceDirs) {
+            if ($dir -notin $declaredModules) {
+              $errors += "Source/ directory '$dir' is not declared as a module in .uplugin"
+            }
+          }
+
+          # 检查 EngineVersion 存在
+          if (-not $uplugin.PSObject.Properties.Name -contains "EngineVersion") {
+            $errors += "uplugin missing EngineVersion property"
+          }
+
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+          Write-Host "✅ Project structure valid (dynamic check against .uplugin)"
+
+  # ┌─────────────────────────────────────────────────────────────┐
+  # │ 6. 汇总状态 (README badge 用)                                 │
   # └─────────────────────────────────────────────────────────────┘
   status:
     name: CI Status
-    needs: [build-validation, include-check, code-quality, security]
+    needs: [build-validation, include-check, code-quality, security, sourcery, project-structure]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -324,11 +398,15 @@ jobs:
           echo "include-check: ${{ needs.include-check.result }}"
           echo "code-quality: ${{ needs.code-quality.result }}"
           echo "security: ${{ needs.security.result }}"
+          echo "sourcery: ${{ needs.sourcery.result }}"
+          echo "project-structure: ${{ needs.project-structure.result }}"
+          # sourcery 是建议性检查，失败不阻塞合并；其余必须 success
           if [[ "${{ needs.build-validation.result }}" != "success" ]] ||
              [[ "${{ needs.include-check.result }}" != "success" ]] ||
              [[ "${{ needs.code-quality.result }}" != "success" ]] ||
-             [[ "${{ needs.security.result }}" != "success" ]]; then
-            echo "❌ One or more checks failed"
+             [[ "${{ needs.security.result }}" != "success" ]] ||
+             [[ "${{ needs.project-structure.result }}" != "success" ]]; then
+            echo "❌ One or more required checks failed"
             exit 1
           fi
-          echo "✅ All CI checks passed 🎉"
+          echo "✅ All required CI checks passed 🎹"
