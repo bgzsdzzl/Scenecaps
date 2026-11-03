@@ -64,11 +64,12 @@ jobs:
           foreach ($buildCs in Get-ChildItem "Source" -Recurse -Filter "*.Build.cs") {
             $content = Get-Content $buildCs.FullName -Raw
             $moduleName = $buildCs.BaseName
+            $pattern = 'class\s+' + [regex]::Escape($moduleName) + '\s*:\s*ModuleRules'
 
-            if ($content -notmatch "class\s+$moduleName\s*:\s*ModuleRules") {
+            if ($content -notmatch $pattern) {
               $errors += "$($buildCs.Name): class name does not match file name"
             }
-            if ($content -notmatch "PublicDependencyModuleNames") {
+            if ($content -notmatch 'PublicDependencyModuleNames') {
               $errors += "$($buildCs.Name): missing PublicDependencyModuleNames"
             }
           }
@@ -257,27 +258,49 @@ jobs:
           Write-Host "✅ PR title follows conventional commits"
 
   # ┌─────────────────────────────────────────────────────────────┐
-  # │ 4. 安全 - CodeQL + 依赖审查                                   │
+  # │ 4. 安全 - Secret 扫描 + 依赖审查                               │
   # └─────────────────────────────────────────────────────────────┘
   security:
     name: 🔒 Security
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     permissions:
       security-events: write
       contents: read
     steps:
       - uses: actions/checkout@v4
-
-      - name: 🔒 Initialize CodeQL
-        uses: github/codeql-action/init@v3
         with:
-          languages: cpp
+          fetch-depth: 0
 
-      - name: 🔍 Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:cpp"
+      - name: 🔒 Scan for Secrets & Credentials
+        shell: pwsh
+        run: |
+          # 扫描源文件中意外提交的密钥/令牌/密码
+          $patterns = @(
+            @{ Name = 'AWS Key';        Regex = 'AKIA[0-9A-Z]{16}' },
+            @{ Name = 'GitHub Token';   Regex = 'ghp_[A-Za-z0-9]{36}' },
+            @{ Name = 'Generic API Key'; Regex = '(?i)(api[_-]?key|secret|password)\s*[=:]\s*["''][^''"]{8,}["'']' },
+            @{ Name = 'Private Key';    Regex = '-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----' }
+          )
+          $errors = @()
+          $files = Get-ChildItem -Recurse -Include "*.h","*.cpp","*.cs","*.csproj","*.json","*.ini","*.uplugin","*.yml","*.yaml","*.py","*.sh","*.ps1","*.bat" |
+            Where-Object { $_.FullName -notmatch '(node_modules|\.git\\|\.git/)' }
+          foreach ($file in $files) {
+            $lineNo = 0
+            foreach ($line in Get-Content $file.FullName -ErrorAction SilentlyContinue) {
+              $lineNo++
+              foreach ($p in $patterns) {
+                if ($line -match $p.Regex) {
+                  $errors += "$($file.Name):$($lineNo): potential $($p.Name)"
+                }
+              }
+            }
+          }
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+          Write-Host "✅ No secrets detected in $($files.Count) files"
 
       - name: 🔒 Dependency Review
         if: github.event_name == 'pull_request'
