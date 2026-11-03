@@ -1,30 +1,40 @@
 {
 	"FileVersion": 3,
 	"Version": 1,
-	"VersionName": "1.0",
+	"VersionName": "1.0.0",
 	"FriendlyName": "Scenecaps",
 	"Description": "Non-destructive scene reference collection asset, compatible with Lumen distance fields.",
 	"Category": "Editing",
-	"CreatedBy": "",
+	"CreatedBy": "Scenecaps Contributors",
+	"CreatedByURL": "https://github.com/bgzsdzzl/Scenecaps",
+	"DocsURL": "https://github.com/bgzsdzzl/Scenecaps/wiki",
+	"MarketplaceURL": "",
+	"SupportURL": "https://github.com/bgzsdzzl/Scenecaps/issues",
 	"CanContainContent": false,
-	"IsBetaVersion": false,
+	"IsBetaVersion": true,
 	"Installed": false,
+	"EngineVersion": "5.8",
+	"EngineVersion": "5.8",
+	"SupportedTargetPlatforms": ["Win64", "Linux", "Mac"],
 	"Plugins": [
 		{
 			"Name": "Niagara",
-			"Enabled": true
+			"Enabled": true,
+			"Optional": true
 		}
 	],
 	"Modules": [
 		{
 			"Name": "Scenecaps",
 			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"LoadingPhase": "Default",
+			"WhitelistTargets": ["Game", "Editor", "Server", "Client"]
 		},
 		{
 			"Name": "ScenecapsEditor",
 			"Type": "Editor",
-			"LoadingPhase": "Default"
+			"LoadingPhase": "PostEngineInit",
+			"WhitelistTargets": ["Editor"]
 		}
 	]
 }

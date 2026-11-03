@@ -3,6 +3,7 @@ Intermediate/
 Binaries/
 DerivedDataCache/
 Saved/
+BuildOutput/
 
 # Visual Studio / Rider
 .vs/
@@ -15,10 +16,12 @@ Saved/
 # UE generated project files
 *.vcxproj
 *.vcxproj.filters
+*.vcxproj.user
 
 # OS
 Thumbs.db
 desktop.ini
+.DS_Store
 
 # Build artifacts
 *.dll
@@ -27,6 +30,7 @@ desktop.ini
 *.pdb
 *.ilk
 *.obj
+*.log
 
 # Large binary files
 *.uasset
@@ -36,5 +40,17 @@ desktop.ini
 *.sig
 
 # Rider
-.idea/BuildOutput/
+.idea/
+
+# Build output
 BuildOutput/
+
+# IDE/Editor
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local config
+*.local
+*.local.*
