@@ -163,15 +163,15 @@ jobs:
           Write-Host "Loaded $($known.Count) known UE 5.8 headers"
 
           # 本项目自己的头文件（相对模块根目录，即 include 的解析方式）
-foreach ($header in Get-ChildItem "Source" -Recurse -Include "*.h","*.hpp") {
-        $full = $header.FullName -replace '\\', '/'
-        if ($full -match '/Source/([^/]+)/(.+)$') {
-          $known["$($Matches[2])"] = $true
-          $known["$($Matches[1])/$($Matches[2])"] = $true
-          # 也加裸文件名（如 "ScenecapsActor.h" 而非 "Public/ScenecapsActor.h"）
-          $known[$Matches[2]] = $true
-        }
-      }
+          foreach ($header in Get-ChildItem "Source" -Recurse -Include "*.h","*.hpp") {
+          $full = $header.FullName -replace '\\', '/'
+          if ($full -match '/Source/([^/]+)/(.+)$') {
+            $known["$($Matches[2])"] = $true
+            $known["$($Matches[1])/$($Matches[2])"] = $true
+            # 也加裸文件名（如 "ScenecapsActor.h" 而非 "Public/ScenecapsActor.h"）
+            $known[$Matches[2]] = $true
+          }
+          }
           # Build.cs、generated.h 等动态文件
           $known["*.generated.h"] = $true
           Write-Host "Total known headers (incl. project): $($known.Count)"
