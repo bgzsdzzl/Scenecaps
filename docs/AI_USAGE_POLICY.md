@@ -456,7 +456,7 @@ Bug 报告应尽可能包含:
 
 在使用AI Agent时，必须保证agent遵守以下内容:
 
-- 不得绕过[AI_AGENTS_GUIDE](docs/AI_AGENTS_GUIDE.md)中的内容
+- 不得绕过[AI_AGENTS_GUIDE](./AI_AGENTS_GUIDE.md)中的内容
 - 在使用MCP时，保留日志
 
 ### 2. 允许的辅助操作
