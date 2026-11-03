@@ -170,6 +170,7 @@ jobs:
             $known["$($Matches[1])/$($Matches[2])"] = $true
             # 也加裸文件名（如 "ScenecapsActor.h" 而非 "Public/ScenecapsActor.h"）
             $known[$Matches[2]] = $true
+            $known[([System.IO.Path]::GetFileName($full))] = $true
           }
           }
           # Build.cs、generated.h 等动态文件
