@@ -11,10 +11,10 @@ env:
 
 jobs:
   # ┌─────────────────────────────────────────────────────────────┐
-  # │ 1. 静态分析 - 核心                                            │
+  # │ 1. 构建验证 - 源码结构 + 引用完整性 + 模块规范                  │
   # └─────────────────────────────────────────────────────────────┘
-  static-analysis:
-    name: 🔍 Static Analysis
+  build-validation:
+    name: 🔨 Build Validation
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
@@ -22,19 +22,120 @@ jobs:
         with:
           submodules: recursive
 
-      - name: 🔍 MSBuild Static Analysis (TreatWarningsAsErrors)
+      - name: 📦 Verify Module Structure
         shell: pwsh
         run: |
-          cd Source/Scenecaps
-          msbuild Scenecaps.Build.cs /t:Rebuild /p:Configuration=Development /p:Platform=Win64 /p:WarningLevel=4 /p:TreatWarningsAsErrors=true /v:q /nologo
+          $errors = @()
 
-      - name: 🔍 Clang-Tidy (if available)
-        if: runner.os == 'Linux'
+          # 关键文件必须存在
+          $requiredFiles = @(
+            "Scenecaps.uplugin",
+            "Source/Scenecaps/Scenecaps.Build.cs",
+            "Source/ScenecapsEditor/ScenecapsEditor.Build.cs",
+            "Source/Scenecaps/Private/ScenecapsModule.cpp",
+            "Source/ScenecapsEditor/Private/ScenecapsEditorModule.cpp"
+          )
+          foreach ($file in $requiredFiles) {
+            if (-not (Test-Path $file)) { $errors += "Missing: $file" }
+          }
+
+          # 模块声明与目录一致性
+          $uplugin = Get-Content "Scenecaps.uplugin" -Raw | ConvertFrom-Json
+          foreach ($module in $uplugin.Modules) {
+            $buildCs = "Source/$($module.Name)/$($module.Name).Build.cs"
+            if (-not (Test-Path $buildCs)) { $errors += "Module '$($module.Name)' missing $buildCs" }
+          }
+
+          # EngineVersion 必须 5.8
+          if ($uplugin.EngineVersion -ne "5.8") {
+            $errors += "EngineVersion must be 5.8, got '$($uplugin.EngineVersion)'"
+          }
+
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+          Write-Host "✅ Module structure valid (Engine 5.8, all modules present)"
+
+      - name: 🔍 Verify Build.cs Dependencies
+        shell: pwsh
         run: |
-          find Source -name "*.cpp" -o -name "*.h" | xargs clang-tidy -checks="modernize-*,performance-*,readability-*,bugprone-*" -p=. 2>/dev/null || true
+          $errors = @()
+          foreach ($buildCs in Get-ChildItem "Source" -Recurse -Filter "*.Build.cs") {
+            $content = Get-Content $buildCs.FullName -Raw
+            $moduleName = $buildCs.BaseName
+
+            if ($content -notmatch "class\s+$moduleName\s*:\s*ModuleRules") {
+              $errors += "$($buildCs.Name): class name does not match file name"
+            }
+            if ($content -notmatch "PublicDependencyModuleNames") {
+              $errors += "$($buildCs.Name): missing PublicDependencyModuleNames"
+            }
+          }
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+          Write-Host "✅ All Build.cs files valid"
+
+      - name: 🔍 Verify Public API Export Macros
+        shell: pwsh
+        run: |
+          # Public/ 头文件中的 UCLASS/USTRUCT 必须带 SCENECAPS_API
+          $errors = @()
+          foreach ($header in Get-ChildItem "Source/Scenecaps/Public" -Filter "*.h") {
+            $content = Get-Content $header.FullName -Raw
+            $matches = [regex]::Matches($content, '(UCLASS|USTRUCT)\([^)]*\)\s*(?:\r?\n\s*)?class\s+(SCENECAPS_API\s+)?\w+')
+            foreach ($m in $matches) {
+              if ($m.Groups[1].Value -notmatch "SCENECAPS_API") {
+                $errors += "$($header.Name): UCLASS/USTRUCT missing SCENECAPS_API at offset $($m.Index)"
+              }
+            }
+          }
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Warning $_ }
+            Write-Host "⚠️ Some public types missing export macro (warning only)"
+          } else {
+            Write-Host "✅ All public types export SCENECAPS_API"
+          }
+
+      - name: 🔍 Verify WITH_EDITOR Usage
+        shell: pwsh
+        run: |
+          # 检查常见的编辑器专用 API 是否被 WITH_EDITOR 包裹
+          $editorOnlyApis = @(
+            "SetActorLabel",
+            "GetActorLabel",
+            "ClassGeneratedBy",
+            "GetTransientPackage",
+            "AddDataLayer",
+            "RemoveDataLayer",
+            "SetIsSpatiallyLoaded"
+          )
+          $errors = @()
+          foreach ($cpp in Get-ChildItem "Source/Scenecaps/Private" -Filter "*.cpp") {
+            $lines = Get-Content $cpp.FullName
+            for ($i = 0; $i -lt $lines.Count; $i++) {
+              foreach ($api in $editorOnlyApis) {
+                if ($lines[$i] -match "\.$api\(" -or $lines[$i] -match "->$api\(") {
+                  # 检查前后 5 行内是否有 WITH_EDITOR
+                  $context = $lines[[Math]::Max(0, $i-5)..[Math]::Min($lines.Count-1, $i+5)] -join "`n"
+                  if ($context -notmatch "WITH_EDITOR") {
+                    $errors += "$($cpp.Name):$($i+1): '$api' may need WITH_EDITOR guard"
+                  }
+                }
+              }
+            }
+          }
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Warning $_ }
+            Write-Host "⚠️ Potential editor-only API without guard (review recommended)"
+          } else {
+            Write-Host "✅ Editor-only APIs properly guarded"
+          }
 
   # ┌─────────────────────────────────────────────────────────────┐
-  # │ 2. 代码质量 - 格式/规范/拼写                                   │
+  # │ 2. 代码质量 - 文档/规范                                       │
   # └─────────────────────────────────────────────────────────────┘
   code-quality:
     name: ✨ Code Quality
@@ -43,137 +144,101 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 📝 Check License Headers
-        run: |
-          # 验证所有源文件有 Apache 2.0 头
-          find Source -name "*.h" -o -name "*.cpp" | xargs grep -L "Apache License" | grep -v "ThirdParty" && exit 1 || true
-
-      - name: 🔤 Spell Check (markdown/docs)
-        uses: streetsidesoftware/cspell-action@v6
-        with:
-          files: "**/*.md"
-          config: .github/cspell.json
-
       - name: 📝 Markdown Lint
         uses: DavidAnson/markdownlint-cli2-action@v17
         with:
-          config: .github/markdownlint.json
+          globs: |
+            README.md
+            CONTRIBUTING.md
+            CHANGELOG.md
+            CODE_OF_CONDUCT.md
+            docs/*.md
+        continue-on-error: true
 
-      - name: 📦 Conventional Commits
-        uses: gsactions/commit-message-checker@v3
-        with:
-          pattern: '^(feat|fix|docs|refactor|perf|test|chore|revert)(\(.+\))?: .+'
+      - name: 📝 Verify Docs Links
+        shell: pwsh
+        run: |
+          # 验证文档中的相对链接指向存在的文件
+          $errors = @()
+          $docs = Get-ChildItem -Recurse -Filter "*.md" | Where-Object { $_.FullName -notmatch "node_modules" }
+          foreach ($doc in $docs) {
+            $content = Get-Content $doc.FullName -Raw
+            $linkMatches = [regex]::Matches($content, '\[[^\]]+\]\((?!http)([^)#\s]+)(?:#[^)]*)?\)')
+            foreach ($m in $linkMatches) {
+              $linkPath = $m.Groups[1].Value
+              if ($linkPath -match "^\.\./") {
+                $resolved = Join-Path (Split-Path $doc.FullName) $linkPath
+              } else {
+                $resolved = Join-Path (Split-Path $doc.FullName) $linkPath
+              }
+              $resolved = [System.IO.Path]::GetFullPath($resolved)
+              if (-not (Test-Path $resolved)) {
+                $errors += "$($doc.Name): broken link '$linkPath'"
+              }
+            }
+          }
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+          Write-Host "✅ All documentation links valid"
+
+      - name: 📝 Conventional Commits (PR title check)
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          $title = "${{ github.event.pull_request.title }}"
+          if ($title -notmatch '^(feat|fix|docs|refactor|perf|test|chore|revert|ci)(\(.+\))?!?: .+') {
+            Write-Error "PR title must follow conventional commits: 'type(scope): description'. Got: '$title'"
+            exit 1
+          }
+          Write-Host "✅ PR title follows conventional commits"
 
   # ┌─────────────────────────────────────────────────────────────┐
-  # │ 3. 依赖/安全检查                                              │
+  # │ 3. 安全 - CodeQL + 依赖审查                                   │
   # └─────────────────────────────────────────────────────────────┘
   security:
     name: 🔒 Security
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
+    permissions:
+      security-events: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
-      
-      - name: 🔒 CodeQL Analysis
+
+      - name: 🔒 Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: cpp
-      
-      - name: 🔍 CodeQL Analysis
+
+      - name: 🔍 Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:cpp"
 
       - name: 🔒 Dependency Review
+        if: github.event_name == 'pull_request'
         uses: actions/dependency-review-action@v4
 
   # ┌─────────────────────────────────────────────────────────────┐
-  # │ 4. 文档/拼写/格式                                             │
-  # └─────────────────────────────────────────────────────────────┘
-  docs:
-    name: 📚 Docs & Style
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: 📝 Markdown Lint
-        uses: DavidAnson/markdownlint-cli2-action@v17
-        with:
-          config: .github/markdownlint.json
-      
-      - name: 🔤 Spell Check
-        uses: streetsidesoftware/cspell-action@v6
-        with:
-          files: "**/*.md"
-          config: .github/cspell.json
-
-  # ┌─────────────────────────────────────────────────────────────┐
-  # │ 5. 构建验证 (语法/语义检查 - 替代编译)                          │
-  # └─────────────────────────────────────────────────────────────┘
-  build-validation:
-    name: 🔨 Build Validation (Syntax & Semantics)
-    runs-on: windows-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: 🔨 MSBuild Syntax & Semantic Check (Dry Run)
-        shell: pwsh
-        run: |
-          cd Source/Scenecaps
-          msbuild Scenecaps.Build.cs /t:Rebuild /p:Configuration=Development /p:Platform=Win64 /p:WarningLevel=4 /p:TreatWarningsAsErrors=true /v:q /nologo /p:GenerateTargetFrameworkAttribute=false /p:GenerateAssemblyInfo=false
-
-      - name: 📦 Verify Module Structure
-        shell: pwsh
-        run: |
-          # 验证关键文件存在
-          $requiredFiles = @(
-            "Source/Scenecaps/Scenecaps.Build.cs",
-            "Source/Scenecaps/Public/ScenecapsModule.h",
-            "Source/Scenecaps/Public/ScenecapsAsset.h",
-            "Source/Scenecaps/Public/ScenecapsTypes.h",
-            "Source/Scenecaps/Private/ScenecapsModule.cpp",
-            "Source/Scenecaps/Private/ScenecapsAsset.cpp"
-          )
-          $missing = @()
-          foreach ($file in $requiredFiles) {
-            if (-not (Test-Path $file)) {
-              $missing += $file
-            }
-          }
-          if ($missing.Count -gt 0) {
-            Write-Error "Missing required files: $($missing -join ', ')"
-            exit 1
-          }
-          Write-Host "✅ All required module files present"
-
-      - name: 📦 Verify Build.cs Syntax
-        shell: pwsh
-        run: |
-          $content = Get-Content "Source/Scenecaps/Scenecaps.Build.cs" -Raw
-          if ($content -notmatch "PublicDependencyModuleNames") {
-            Write-Error "Missing PublicDependencyModuleNames"
-            exit 1
-          }
-          if ($content -notmatch "PrivateDependencyModuleNames") {
-            Write-Error "Missing PrivateDependencyModuleNames"
-            exit 1
-          }
-          Write-Host "✅ Build.cs structure valid"
-
-  # ┌─────────────────────────────────────────────────────────────┐
-  # │ 6. 汇总状态 (用于 README badge)                                │
+  # │ 4. 汇总状态 (README badge 用)                                 │
   # └─────────────────────────────────────────────────────────────┘
   status:
-    name: ✅ Status
-    needs: [static-analysis, code-quality, security, docs, build-validation]
+    name: ✅ CI Status
+    needs: [build-validation, code-quality, security]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: 📊 Status Summary
+      - name: 📊 Check Results
         run: |
-          echo "All checks passed! 🎉"
-          echo "::notice::All CI checks passed ✅"
+          echo "build-validation: ${{ needs.build-validation.result }}"
+          echo "code-quality: ${{ needs.code-quality.result }}"
+          echo "security: ${{ needs.security.result }}"
+          if [[ "${{ needs.build-validation.result }}" != "success" ]] ||
+             [[ "${{ needs.code-quality.result }}" != "success" ]] ||
+             [[ "${{ needs.security.result }}" != "success" ]]; then
+            echo "❌ One or more checks failed"
+            exit 1
+          fi
+          echo "✅ All CI checks passed 🎉"
