@@ -7,7 +7,7 @@
 ## 分支策略
 
 | 分支 | 用途 | 保护 |
-|------|------|------|
+| ------ | ------ | ------ |
 | `main` | 稳定发布分支 | 受保护，仅允许 PR 合并 |
 | `develop` | 开发集成分支 | 受保护，仅允许 PR 合并 |
 | `feature/*` | 新功能开发 | 临时，合并后删除 |
@@ -32,8 +32,8 @@ refactor/short-description   # 代码重构
 test/short-description       # 测试相关
 ```
 
-
 示例：
+
 - `feature/biome-radial-distribution`
 - `fix/variant-transition-crash`
 - `docs/update-readme-installation`
@@ -53,8 +53,8 @@ test/short-description       # 测试相关
 [optional footer(s)]
 ```
 
-
 **类型：**
+
 - `feat` - 新功能
 - `fix` - 缺陷修复
 - `docs` - 文档更新
@@ -76,7 +76,6 @@ to avoid overbright preview.
 Closes #123
 ```
 
-
 ```text
 fix(runtime): disable default lighting in preview scene
 
@@ -86,7 +85,6 @@ preview caused by default sky/atmosphere lighting.
 
 Fixes #456
 ```
-
 
 ---
 
@@ -147,10 +145,10 @@ Relates to #456
 - [ ] 文档需同步更新
 ```
 
-
 ### 3. 代码审核
 
 #### 审核者职责
+
 - 代码逻辑正确性
 
 - 符合 [CODING_STANDARDS.md](CODING_STANDARDS.md)
@@ -159,6 +157,7 @@ Relates to #456
 - 文档同步更新
 
 #### 审核流程
+
 1. 自动 CI 检查通过
 
 - [ ] Editor (Development) 编译
@@ -174,12 +173,13 @@ Relates to #456
 ### 4. 合并策略
 
 | 场景 | 合并方式 |
-|------|----------|
+| ------ | ---------- |
 | 常规功能/修复 | Squash and merge（压缩为单提交） |
 | 多提交关联功能 | Rebase and merge（保留历史） |
 | 热修复 | Squash and merge 到 main + cherry-pick 到 develop |
 
 **合并前检查：**
+
 - [ ] 所有 CI 通过
 - [ ] 无 `Request Changes` 未解决
 - [ ] 至少 1 个 `Approve`
@@ -244,20 +244,20 @@ git checkout v1.2.3
 git push origin main --force-with-lease
 ```
 
-
 ---
 
 ## 常见问题
 
 ### Q: PR 被 Request Changes 怎么办？
+
 A: 根据反馈修改，推送新提交到同一分支，PR 自动更新，请审核者再次审核。
 
-
 ### Q: CI 失败但本地通过？
+
 A: 检查环境差异（UE 版本、插件版本、依赖模块），补充缺失依赖或修复平台差异。
 
-
 ### Q: 如何解决合并冲突？
+
 ```bash
 
 git checkout feature/your-branch
@@ -272,10 +272,9 @@ git rebase --continue
 git push -f origin feature/your-branch
 ```
 
-
 ### Q: 如何撤销已合并的 PR？
-A: `git revert <merge-commit-sha> -m 1` 创建反向提交，再次 PR 合并。
 
+A: `git revert <merge-commit-sha> -m 1` 创建反向提交，再次 PR 合并。
 
 ---
 

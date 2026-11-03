@@ -15,7 +15,7 @@
 ## 命名约定
 
 | 元素 | 约定 | 示例 |
-|------|------|------|
+| ------ | ------ | ------ |
 | 类/结构体/枚举/接口 | PascalCase | `UScenecapsAsset`, `EScenecapsModifierPhase` |
 | 函数/方法 | PascalCase | `GetSpawnedActors()`, `ApplyModifiers()` |
 | 变量/参数/成员 | camelCase | `spawnedActors`, `entryId` |
@@ -45,7 +45,6 @@ Source/
 └── ThirdParty/                # 第三方依赖（如有）
 ```
 
-
 - 公开 API 头文件放在 `Public/`，标记 `SCENECAPS_API`
 - 私有实现放在 `Private/`
 - 模块 `Build.cs` 必须声明所有依赖
@@ -57,7 +56,7 @@ Source/
 ### 智能指针使用
 
 | 指针类型 | 适用场景 |
-|----------|----------|
+| ---------- | ---------- |
 | `TObjectPtr<T>` | UObject 成员引用（GC 追踪） |
 | `TWeakObjectPtr<T>` | 非拥有引用，避免循环引用 |
 | `TSoftObjectPtr<T>` / `TSoftClassPtr<T>` | 延迟加载、资产引用 |
@@ -71,7 +70,7 @@ Source/
 ### 容器选择
 
 | 容器 | 适用场景 |
-|------|----------|
+| ------ | ---------- |
 | `TArray<T>` | 有序序列，随机访问，频繁增删尾部 |
 | `TMap<Key, Value>` | 键值查找，键唯一 |
 | `TSet<T>` | 唯一元素集合，成员测试 |
@@ -128,7 +127,6 @@ enum class EScenecapsModifierPhase : uint8
 };
 ```
 
-
 ### 属性规范
 
 ```cpp
@@ -154,7 +152,6 @@ UPROPERTY(EditAnywhere, Category = "World Partition")
 TSoftObjectPtr<UDataLayerAsset> TargetDataLayer;
 ```
 
-
 ### 函数规范
 
 ```cpp
@@ -172,7 +169,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnVariantChanged, FName, NewVariant
 UPROPERTY(BlueprintAssignable, Category = "Scenecaps|Events")
 FOnVariantChanged OnVariantChanged;
 ```
-
 
 ---
 
@@ -210,7 +206,6 @@ void AScenecapsActor::Rebuild()
 }
 ```
 
-
 ### 注释规范
 
 ```cpp
@@ -233,7 +228,6 @@ UFUNCTION(BlueprintPure, Category = "Scenecaps|Variants")
 FName GetActiveVariant() const;
 ```
 
-
 - 公开 API 必须有文档注释
 - 复杂逻辑添加行内注释
 - `// TODO:` 标记待办，`// FIXME:` 标记已知问题
@@ -251,7 +245,7 @@ FName GetActiveVariant() const;
 ## 禁止事项
 
 | 禁止项 | 替代方案 |
-|--------|----------|
+| -------- | ---------- |
 | `new`/`delete` UObject | `NewObject<>()` / `SpawnActor<>()` |
 | 裸指针 `UObject*` 成员 | `TObjectPtr<>`, `TWeakObjectPtr<>` |
 | `std::vector/map/string` | `TArray/TMap/TString` |

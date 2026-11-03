@@ -10,6 +10,7 @@
 ## [未发布]
 
 ### 新增 (未发布)
+
 - 编辑器预览视口：每物体点光源（无全局天空/大气）
 
 - 变体过渡系统：支持插值
@@ -22,6 +23,7 @@
 - 变体过渡组件（支持插值）
 
 ### 变更
+
 - 编辑器预览：完全移除天空/大气/全局光
 
 - 编辑器预览：每物体点光源（强度 150、半径 300）
@@ -29,6 +31,7 @@
 - 禁用 SkyLight、DirectionalLight、清理 SkyAtmosphere
 
 ### 修复
+
 - 编辑器预览光照过亮（默认光照导致）
 
 - 变体过渡 ApplyInterpolationToAsset/ISM 实现
@@ -37,14 +40,15 @@
 - SnapshotActorsAsSceneAsset Game 目标返回 nullptr
 
 ### 移除
-- 编辑器预览中的全局 SkyLight、DirectionalLight、SkyAtmosphere
 
+- 编辑器预览中的全局 SkyLight、DirectionalLight、SkyAtmosphere
 
 ---
 
 ## [1.0.0] - 2024-XX-XX
 
 ### 新增
+
 - 首个发布版本
 
 - 场景集合资产系统

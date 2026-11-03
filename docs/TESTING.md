@@ -7,7 +7,7 @@
 ## 测试层级
 
 | 层级 | 范围 | 工具/方法 |
-|------|------|-----------|
+| ------ | ------ | ----------- |
 | 单元测试 | 独立函数/类 | 自动化测试框架（待引入） |
 | 集成测试 | 模块交互 | Editor 自动化测试 / Gauntlet |
 | 端到端测试 | 完整工作流 | 手动 + 自动化回归 |
@@ -18,7 +18,7 @@
 ## 必测配置矩阵
 
 | 目标 | Editor Development | Game Development | Game Shipping |
-|------|-------------------|------------------|---------------|
+| ------ | ------------------- | ------------------ | --------------- |
 | Runtime 模块 | ✅ | ✅ | ✅ |
 | Editor 模块 | ✅ | ❌ | ❌ |
 | Niagara 启用 | ✅ | ✅ | ✅ |
@@ -34,7 +34,7 @@
 ### 场景集合核心
 
 | 测试项 | 预期结果 |
-|--------|----------|
+| -------- | ---------- |
 | 创建 ScenecapsAsset | 资产创建成功，RootId 生成 |
 | 添加/删除/移动条目 | 层级结构正确，ParentId 更新 |
 | 变体创建/切换 | 仅 Overrides 生效，Base 不变 |
@@ -45,7 +45,7 @@
 ### 变体系统
 
 | 测试项 | 预期结果 |
-|--------|----------|
+| -------- | ---------- |
 | 创建/删除/重命名变体 | 变体列表更新 |
 | 添加条目到变体 | Override 生成，仅受影响字段 |
 | 从变体移除条目 | Override 移除，回退 Base |
@@ -55,7 +55,7 @@
 ### ISM/HISM 批量生成
 
 | 测试项 | 预期结果 |
-|--------|----------|
+| -------- | ---------- |
 | SpawnCollectionAsISM | 相同 Mesh 合并为单 ISM，实例数正确 |
 | SpawnCollectionAsHISM | HISM 创建，LOD/树构建正常 |
 | 运行时 ISM 操作 | Add/Remove/UpdateInstance 实时生效 |
@@ -64,7 +64,7 @@
 ### 程序化生成
 
 | 测试项 | 预期结果 |
-|--------|----------|
+| -------- | ---------- |
 | BiomeAsset 生成 | 按坡度/高度/遮罩筛选 |
 | Grid/Poisson/Noise/Radial | 分布符合参数 |
 | Seed 确定性 | 相同 Seed 生成相同结果 |
@@ -73,7 +73,7 @@
 ### Data Layer 集成
 
 | 测试项 | 预期结果 |
-|--------|----------|
+| -------- | ---------- |
 | Entry 指定 DataLayer | 生成 Actor 自动加入对应 DataLayer |
 | Actor 级 DataLayer | 优先级高于 Entry 级 |
 | bSpawnOnDataLayerLoaded | DataLayer 激活时自动 Rebuild |
@@ -82,7 +82,7 @@
 ### 快照记录器
 
 | 测试项 | 预期结果 |
-|--------|----------|
+| -------- | ---------- |
 | SnapshotWorldAsSceneAsset | 捕获关卡 Actor 层级/变换/材质 |
 | 保存为 Asset | 可在 Content Browser 打开 |
 | 恢复快照 | SpawnSceneSnapshot 恢复原貌 |
@@ -90,7 +90,7 @@
 ### Actor 池
 
 | 测试项 | 预期结果 |
-|--------|----------|
+| -------- | ---------- |
 | Acquire/Release | 复用 Actor，避免频繁 Spawn/Destroy |
 | Prewarm | 预热指定数量 |
 | CleanupIdle | 超时自动销毁闲置 Actor |
@@ -98,7 +98,7 @@
 ### 修改器系统
 
 | 测试项 | 预期结果 |
-|--------|----------|
+| -------- | ---------- |
 | Register/Unregister | 优先级排序生效 |
 | Phase 执行顺序 | PreSpawn → PostSpawn → PerEntry |
 | TransformModifier | Location/Rotation/Scale 叠加 |
@@ -108,7 +108,7 @@
 ### 编辑器工具
 
 | 测试项 | 预期结果 |
-|--------|----------|
+| -------- | ---------- |
 | Outliner 拖拽重排 | ParentId 更新，层级正确 |
 | 变体下拉切换 | 预览实时更新 |
 | 批量编辑 | 多选属性同步修改 |
@@ -137,7 +137,6 @@ RunUAT.bat BuildPlugin -Plugin=... -TargetPlatforms=Win64 -TargetConfigurations=
 
 ```
 
-
 ### 静态分析
 
 - MSBuild 警告视为错误 (`TreatWarningsAsErrors=true`)
@@ -153,7 +152,6 @@ obj list class=Scenecaps
 obj refs class=ScenecapsActor
 ```
 
-
 - 无内存泄漏（退出时对象计数归零）
 - 无 GC 引用循环
 
@@ -162,7 +160,7 @@ obj refs class=ScenecapsActor
 ## 性能基准
 
 | 场景 | 基准 | 通过标准 |
-|------|------|----------|
+| ------ | ------ | ---------- |
 | 10k 实例 ISM 生成 | < 2s | < 3s |
 | 变体切换 (1k Actor) | < 100ms | < 200ms |
 | 变体过渡 (1s) | 60 FPS | ≥ 55 FPS |
@@ -194,7 +192,7 @@ obj refs class=ScenecapsActor
 ## 已知问题与规避
 
 | 问题 | 状态 | 规避方案 |
-|------|------|----------|
+| ------ | ------ | ---------- |
 | 大量 Actor 选中时编辑器卡顿 | 已知 | 分批选择 / 使用 Outliner 搜索 |
 | 变体过渡中材质插值闪烁 | 调查中 | 临时禁用材质插值 |
 | Niagara 粒子在 ISM 上不渲染 | 引擎限制 | 使用单独 Actor 承载 Niagara |
