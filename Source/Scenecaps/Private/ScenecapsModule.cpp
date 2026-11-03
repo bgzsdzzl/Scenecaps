@@ -46,6 +46,8 @@ void FScenecapsModule::StartupModule()
     // ---- DLL 扩展管理器（保留上一轮方案） ----
     FScenecapsExtensionManager::Get().Initialize();
 
+    UE_LOG(LogScenecaps, Log, TEXT("[Scenecaps.Module] Startup complete: %d data-driven entries loaded"), DataDriven.GetEntryCount());
+
     // ---- 控制台命令：热重载 .scx ----
     {
         IConsoleObject* Cmd = IConsoleManager::Get().RegisterConsoleCommand(
