@@ -253,11 +253,21 @@ jobs:
       - name: Conventional Commits (PR title check)
         if: github.event_name == 'pull_request'
         shell: pwsh
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          $title = "${{ github.event.pull_request.title }}"
+          $title = $env:PR_TITLE
           if ($title -notmatch '^(feat|fix|docs|refactor|perf|test|chore|revert|ci)(\(.+\))?!?: .+') {
             Write-Error "PR title must follow conventional commits: 'type(scope): description'. Got: '$title'"
             exit 1
+          }
+          # 若 PR 描述声明使用了 AI，标题末尾须带模型标识 [Model-Version]
+          if ($env:PR_BODY -match '(?m)^\s*使用情况[：:]\s*(辅助性|实质性)') {
+            if ($title -notmatch '\[[^\[\]]+\]\s*$') {
+              Write-Error "AI-assisted PR title must end with a model tag like [Model-Version]. Got: '$title'"
+              exit 1
+            }
           }
           Write-Host "✅ PR title follows conventional commits"
 

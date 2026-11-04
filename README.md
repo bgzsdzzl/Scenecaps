@@ -28,19 +28,23 @@ Scenecaps 以「场景集合资产」为核心，将关卡中的多个对象组�
 | ISM/HISM 批量实例化 | 自动实例化以提升性能 |
 | 变体过渡 / Variant Transitions | 变体之间的平滑插值过渡 |
 | 生物群系程序化生成 | 网格、泊松圆盘、噪声聚类、径向分布 |
-| Data Layer 集成 | 与 World Partition 协作 |
+| Data Layer 集成 | 在编辑器中与 World Partition 协作 |
 | 修改器系统 / Modifier System | 基于阶段的可扩展修改器 |
 | 快照记录器 / Snapshot Recorder | 捕获关卡对象为场景集合 |
 | Actor 池 / Actor Pool | 运行时对象复用 |
+
+> [!NOTE]
+> Data Layer 的加载状态触发重建目前仅在编辑器中生效。Game 目标尚未提供等价的运行时 Data Layer 处理，运行时需通过显式调用触发重建。
 
 ---
 
 ## 三、环境要求
 
 - Unreal Engine 5.8 或更高版本；
-- Windows 10/11（x64）；
-- Visual Studio 2022 17.8+ 或兼容的 C++ 工具链；
-- Niagara（可选，用于粒子类条目）。
+- 编辑器平台：Windows、macOS 或 Linux；
+- 目标平台：Win64、Linux、Mac；
+- 编译器：Windows 使用 Visual Studio 2022 17.8+，其他平台使用兼容的 Clang 工具链；
+- Niagara（可选，用于粒子类条目，可通过构建环境变量关闭）。
 
 插件同时提供 Runtime 模块与 Editor 模块，可在 Game 目标中仅保留 Runtime 功能。
 
@@ -62,7 +66,7 @@ Scenecaps 以「场景集合资产」为核心，将关卡中的多个对象组�
 2. 向集合中添加条目，每个条目描述一个对象及其变换；
 3. 需要时创建变体，仅覆盖发生变化的字段；
 4. 将 `AScenecapsActor` 放入关卡，指定集合资产；
-5. 调用重建，或由变体切换、Data Layer 事件触发重建。
+5. 调用重建，或由变体切换触发重建；在编辑器中，Data Layer 的加载状态变化也会触发重建。
 
 程序化生成、快照记录与 Actor 池为可选能力，按需接入。
 

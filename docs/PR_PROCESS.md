@@ -186,15 +186,33 @@ Signed-off-by: Name <email@example.com>
 
 ## 八、回滚
 
-发现严重回归时，可采用以下方式：
+发现严重回归时，通过创建回滚分支并提交 Pull Request 撤销，不应直接向受保护分支推送。
+
+回滚命令取决于原改动的合并方式：
 
 ```bash
-# 回滚某次合并
-git revert <merge-commit-sha> -m 1
-git push origin main
+# 情况一：Squash and merge（常规功能与修复）
+# 定位被压缩后的单个提交并直接撤销
+git revert <squash-commit-sha>
+
+# 情况二：Rebase and merge（保留历史）
+# 逐条撤销相关提交
+git revert <commit-sha-1> <commit-sha-2>
+
+# 情况三：真正的合并提交
+# 使用 -m 指定保留的主干侧
+git revert -m 1 <merge-commit-sha>
 ```
 
-回滚同样通过 Pull Request 进行，不应直接向受保护分支推送。
+随后创建回滚分支并推送，再通过 Pull Request 提交：
+
+```bash
+git checkout -b revert/<target>
+git revert <commit-sha>
+git push origin revert/<target>
+```
+
+在 GitHub 上发起 Pull Request，按正常流程审查与合并。
 
 ---
 
@@ -245,7 +263,7 @@ git push --force-with-lease origin feature/your-branch
 
 ### Q：如何撤销已合并的 PR？
 
-使用 `git revert <merge-commit-sha> -m 1` 创建反向提交，再通过 PR 合并。
+视合并方式选择命令：Squash 或 rebase 合并的 PR 使用 `git revert <commit-sha>`；真正的合并提交使用 `git revert -m 1 <merge-commit-sha>`。回滚应通过分支与 Pull Request 提交，详见「回滚」章节。
 
 ### Q：提交未签名或被规则集拦截？
 
