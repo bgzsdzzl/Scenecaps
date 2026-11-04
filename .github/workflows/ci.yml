@@ -27,35 +27,36 @@ jobs:
         run: |
           $errors = @()
 
-          # 关键文件必须存在
-          $requiredFiles = @(
-            "Scenecaps.uplugin",
-            "Source/Scenecaps/Scenecaps.Build.cs",
-            "Source/ScenecapsEditor/ScenecapsEditor.Build.cs",
-            "Source/Scenecaps/Private/ScenecapsModule.cpp",
-            "Source/ScenecapsEditor/Private/ScenecapsEditorModule.cpp"
-          )
-          foreach ($file in $requiredFiles) {
-            if (-not (Test-Path $file)) { $errors += "Missing: $file" }
+          # 动态发现 .uplugin 文件（不写死插件名/模块名）
+          $upluginFiles = @(Get-ChildItem -Filter "*.uplugin")
+          if ($upluginFiles.Count -eq 0) {
+            Write-Error "No .uplugin file found in repository root"
+            exit 1
           }
+          $uplugin = Get-Content $upluginFiles[0].FullName -Raw | ConvertFrom-Json
 
-          # 模块声明与目录一致性
-          $uplugin = Get-Content "Scenecaps.uplugin" -Raw | ConvertFrom-Json
+          # 模块声明与目录一致性（按 uplugin 声明动态验证）
           foreach ($module in $uplugin.Modules) {
-            $buildCs = "Source/$($module.Name)/$($module.Name).Build.cs"
-            if (-not (Test-Path $buildCs)) { $errors += "Module '$($module.Name)' missing $buildCs" }
+            $moduleDir = "Source/$($module.Name)"
+            $buildCs = "$moduleDir/$($module.Name).Build.cs"
+            if (-not (Test-Path $moduleDir)) {
+              $errors += "Module '$($module.Name)' directory missing: $moduleDir"
+            }
+            if (-not (Test-Path $buildCs)) {
+              $errors += "Module '$($module.Name)' missing $buildCs"
+            }
           }
 
-          # EngineVersion 必须 5.8
-          if ($uplugin.EngineVersion -ne "5.8") {
-            $errors += "EngineVersion must be 5.8, got '$($uplugin.EngineVersion)'"
+          # EngineVersion 必须与工作流 UE_VERSION 一致
+          if ($uplugin.EngineVersion -ne $env:UE_VERSION) {
+            $errors += "EngineVersion must be $($env:UE_VERSION), got '$($uplugin.EngineVersion)'"
           }
 
           if ($errors.Count -gt 0) {
             $errors | ForEach-Object { Write-Error $_ }
             exit 1
           }
-          Write-Host "✅ Module structure valid (Engine 5.8, all modules present)"
+          Write-Host "✅ Module structure valid (Engine $($env:UE_VERSION), all declared modules present)"
 
       - name: Verify Build.cs Dependencies
         shell: pwsh
@@ -310,11 +311,72 @@ jobs:
         uses: actions/dependency-review-action@v4
 
   # ┌─────────────────────────────────────────────────────────────┐
-  # │ 5. 汇总状态 (README badge 用)                                 │
+  # │ 5. 项目结构检查 - 动态基于 .uplugin，不写死具体文件            │
+  # └─────────────────────────────────────────────────────────────┘
+  project-structure:
+    name: Project Structure Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Dynamic Project Structure
+        shell: pwsh
+        run: |
+          $errors = @()
+
+          # 查找根目录 .uplugin 文件
+          $upluginFiles = Get-ChildItem -Filter "*.uplugin"
+          if ($upluginFiles.Count -eq 0) {
+            Write-Error "No .uplugin file found in repository root"
+            exit 1
+          }
+          $upluginPath = $upluginFiles[0].FullName
+          $uplugin = Get-Content $upluginPath -Raw | ConvertFrom-Json
+
+          # 必要的顶层文件（后缀匹配，不写死具体文件名）
+          $requiredRootExtensions = @(".uplugin")
+          foreach ($ext in $requiredRootExtensions) {
+            if (-not (Get-ChildItem -Filter "*$ext")) {
+              $errors += "Missing root file: *$ext"
+            }
+          }
+
+          # 动态检查：uplugin 声明的每个模块都必须有对应的 Build.cs
+          foreach ($module in $uplugin.Modules) {
+            $buildCs = "Source/$($module.Name)/$($module.Name).Build.cs"
+            if (-not (Test-Path $buildCs)) {
+              $errors += "Module '$($module.Name)' declared in uplugin but missing $buildCs"
+            }
+          }
+
+          # 动态检查：Source/ 下含 .Build.cs 的模块目录都应在 uplugin 中声明
+          # 非模块支持目录（如 ThirdParty）不含 .Build.cs，自动跳过
+          $declaredModules = @($uplugin.Modules | ForEach-Object { $_.Name })
+          $sourceDirs = Get-ChildItem "Source" -Directory
+          foreach ($dir in $sourceDirs) {
+            $hasBuildCs = @(Get-ChildItem $dir.FullName -Filter "*.Build.cs" -ErrorAction SilentlyContinue).Count -gt 0
+            if ($hasBuildCs -and $dir.Name -notin $declaredModules) {
+              $errors += "Source/$($dir.Name) contains a .Build.cs but is not declared as a module in .uplugin"
+            }
+          }
+
+          # 检查 EngineVersion 存在
+          if (-not $uplugin.PSObject.Properties.Name -contains "EngineVersion") {
+            $errors += "uplugin missing EngineVersion property"
+          }
+
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+          Write-Host "✅ Project structure valid (dynamic check against .uplugin)"
+
+  # ┌─────────────────────────────────────────────────────────────┐
+  # │ 6. 汇总状态 (README badge 用)                                 │
   # └─────────────────────────────────────────────────────────────┘
   status:
     name: CI Status
-    needs: [build-validation, include-check, code-quality, security]
+    needs: [build-validation, include-check, code-quality, security, project-structure]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -324,11 +386,14 @@ jobs:
           echo "include-check: ${{ needs.include-check.result }}"
           echo "code-quality: ${{ needs.code-quality.result }}"
           echo "security: ${{ needs.security.result }}"
+          echo "project-structure: ${{ needs.project-structure.result }}"
+          # 其余必须 success
           if [[ "${{ needs.build-validation.result }}" != "success" ]] ||
              [[ "${{ needs.include-check.result }}" != "success" ]] ||
              [[ "${{ needs.code-quality.result }}" != "success" ]] ||
-             [[ "${{ needs.security.result }}" != "success" ]]; then
-            echo "❌ One or more checks failed"
+             [[ "${{ needs.security.result }}" != "success" ]] ||
+             [[ "${{ needs.project-structure.result }}" != "success" ]]; then
+            echo "❌ One or more required checks failed"
             exit 1
           fi
-          echo "✅ All CI checks passed 🎉"
+          echo "✅ All required CI checks passed 🎹"
