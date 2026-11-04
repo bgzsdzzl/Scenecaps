@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 贡献指南
+    url: https://github.com/bgzsdzzl/Scenecaps/blob/main/CONTRIBUTING.md
+    about: 在提交前，请阅读贡献指南了解参与方式与要求。
+  - name: 行为准则
+    url: https://github.com/bgzsdzzl/Scenecaps/blob/main/CODE_OF_CONDUCT.md
+    about: 所有参与者需遵守行为准则。
