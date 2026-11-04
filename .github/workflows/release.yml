@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag matches plugin version
+        shell: pwsh
+        run: |
+          $tagVersion = "${{ github.ref_name }}" -replace '^v',''
+          $uplugin = Get-Content (Get-ChildItem -Filter "*.uplugin")[0].FullName -Raw | ConvertFrom-Json
+          if ($uplugin.VersionName -ne $tagVersion) {
+            Write-Error "Tag version '$tagVersion' does not match uplugin VersionName '$($uplugin.VersionName)'"
+            exit 1
+          }
+          Write-Host "✅ Tag ${{ github.ref_name }} matches plugin VersionName $tagVersion"
+
+      - name: Package plugin
+        run: |
+          set -e
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          zip -r "dist/Scenecaps-${VERSION}.zip" . \
+            -x ".git/*" ".github/*" "node_modules/*" "dist/*" "*.zip"
+          ls -la dist
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.zip \
+            --title "Scenecaps $GITHUB_REF_NAME" \
+            --generate-notes

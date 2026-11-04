@@ -15,7 +15,15 @@ public class Scenecaps : ModuleRules
 
         PrivateDependencyModuleNames.AddRange(new string[] { "Json", "JsonUtilities", "Projects" });
 
+        // Niagara 集成默认启用，可通过环境变量 SCENECAPS_WITH_NIAGARA=0 关闭
         bool bEnableNiagaraHandler = true;
+        string NiagaraSetting = System.Environment.GetEnvironmentVariable("SCENECAPS_WITH_NIAGARA");
+        if (!string.IsNullOrEmpty(NiagaraSetting))
+        {
+            bool bDisabled = NiagaraSetting == "0" ||
+                NiagaraSetting.Equals("false", System.StringComparison.OrdinalIgnoreCase);
+            bEnableNiagaraHandler = !bDisabled;
+        }
 
         if (bEnableNiagaraHandler)
         {
