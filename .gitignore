@@ -4,6 +4,7 @@ Binaries/
 DerivedDataCache/
 Saved/
 BuildOutput/
+dist/
 
 # Visual Studio / Rider / VSCode
 .vs/

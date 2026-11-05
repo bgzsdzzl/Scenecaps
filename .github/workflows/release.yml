@@ -29,14 +29,9 @@ jobs:
           }
           Write-Host "✅ Tag ${{ github.ref_name }} matches plugin VersionName $tagVersion"
 
-      - name: Package plugin
-        run: |
-          set -e
-          VERSION="${GITHUB_REF_NAME#v}"
-          mkdir -p dist
-          zip -r "dist/Scenecaps-${VERSION}.zip" . \
-            -x ".git/*" ".github/*" "node_modules/*" "dist/*" "*.zip"
-          ls -la dist
+      - name: Generate packages and release notes
+        shell: pwsh
+        run: ./scripts/Generate-Release.ps1 -Version "$env:GITHUB_REF_NAME"
 
       - name: Create GitHub Release
         env:
@@ -44,4 +39,4 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" dist/*.zip \
             --title "Scenecaps $GITHUB_REF_NAME" \
-            --generate-notes
+            --notes-file dist/RELEASE_NOTES.md
