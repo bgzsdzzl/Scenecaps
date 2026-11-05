@@ -13,10 +13,10 @@ public class ScenecapsEditor : ModuleRules
             "Engine",
             "Scenecaps",
             "AssetDefinition",
-            "AssetRegistry",
             "Slate",
             "SlateCore",
-            "Renderer"
+            "Renderer",
+            "AssetRegistry"
         });
 
         PrivateDependencyModuleNames.AddRange(new string[] 
@@ -25,21 +25,14 @@ public class ScenecapsEditor : ModuleRules
             "EditorFramework", 
             "EditorWidgets", 
             "EditorStyle", 
-            "AdvancedPreviewScene", 
-            "AssetTools", 
-            "AssetRegistry", 
-            "PropertyEditor", 
+            "AdvancedPreviewScene",
+            "AssetTools",
+            "PropertyEditor",
             "ToolMenus", 
             "LevelEditor", 
             "AppFramework", 
             "InputCore", 
-            "ContentBrowser" 
-        });
-
-        // Ensure public headers are accessible
-        PublicIncludePaths.AddRange(new string[] 
-        {
-            ModuleDirectory + "/Public"
+            "ContentBrowser"
         });
     }
 }

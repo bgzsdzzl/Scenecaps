@@ -5,9 +5,10 @@ DerivedDataCache/
 Saved/
 BuildOutput/
 
-# Visual Studio / Rider
+# Visual Studio / Rider / VSCode
 .vs/
 .idea/
+.vscode/
 *.sln
 *.suo
 *.user
@@ -17,6 +18,10 @@ BuildOutput/
 *.vcxproj
 *.vcxproj.filters
 *.vcxproj.user
+
+# Node.js tooling (markdownlint)
+node_modules/
+package-lock.json
 
 # OS
 Thumbs.db
@@ -39,14 +44,7 @@ desktop.ini
 *.pak
 *.sig
 
-# Rider
-.idea/
-
-# Build output
-BuildOutput/
-
-# IDE/Editor
-.vscode/
+# Editor temp
 *.swp
 *.swo
 *~

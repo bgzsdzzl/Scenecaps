@@ -1,0 +1,12 @@
+{
+  "name": "scenecaps-tooling",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dev tooling for the Scenecaps UE plugin (markdown lint). Plugin source lives in Source/.",
+  "devDependencies": {
+    "markdownlint-cli2": "^0.14.0"
+  },
+  "scripts": {
+    "lint:md": "markdownlint-cli2"
+  }
+}
