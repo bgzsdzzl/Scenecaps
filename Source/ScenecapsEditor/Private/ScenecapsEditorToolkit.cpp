@@ -592,7 +592,9 @@ void FScenecapsEditorToolkit::ShowEntriesDetails(const TArray<FGuid>& EntryIds)
             DetailsEntryIds = EntryIds;
             BatchDetailsScope.Reset();
             DetailsStructScope = MakeShared<FStructOnScope>(FScenecapsEditorEntryView::StaticStruct());
-            FMemory::Memcpy(DetailsStructScope->GetStructMemory(), &V, sizeof(FScenecapsEditorEntryView));
+            FScenecapsEditorEntryView* ScopedView =
+                reinterpret_cast<FScenecapsEditorEntryView*>(DetailsStructScope->GetStructMemory());
+            *ScopedView = V;
             Details->SetStructureData(DetailsStructScope);
         }
         else { ShowAssetDetails(); return; }
