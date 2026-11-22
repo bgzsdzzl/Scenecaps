@@ -7,6 +7,17 @@
 #include "ScenecapsBatchEdit.h"
 #include "ScenecapsEditorModule.h"
 #include "ScenecapsLocalization.h"
+#include "ScenecapsViewportConfig.h"
+
+#include "ContentBrowserModule.h"
+#include "IContentBrowserSingleton.h"
+#include "Engine/TextureCube.h"
+#include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Input/SButton.h"
+#include "Widgets/Text/STextBlock.h"
+#include "Widgets/Layout/SBorder.h"
+#include "Widgets/SBoxPanel.h"
+#include "Widgets/Input/SMenuAnchor.h"
 
 #include "Components/PointLightComponent.h"
 #include "Components/DirectionalLightComponent.h"
@@ -108,6 +119,7 @@ FPreviewScene::ConstructionValues CVS;
         M->RegisterToolkit(SharedThis(this));
 
     RebuildPreviewScene();
+    ApplyHDRISkyboxToPreview();
 }
 
 FName        FScenecapsEditorToolkit::GetToolkitFName() const { return FName(TEXT("ScenecapsEditor")); }
@@ -145,12 +157,64 @@ TSharedRef<SDockTab> FScenecapsEditorToolkit::SpawnTab_Viewport(const FSpawnTabA
         .Toolkit(SharedThis(this));
     ViewportWidget = Viewport;
 
+    // 视口顶部工具条：HDRI 天空盒默认关闭，必须手动选择 HDRI 贴图后才会启用
+    TSharedRef<SWidget> HDRIToolbar =
+        SNew(SBorder)
+        .Padding(FMargin(4.f, 3.f))
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+            [
+                SNew(SCheckBox)
+                .IsChecked_Lambda([this]() -> ECheckBoxState
+                    {
+                        return IsHDRISkyboxEnabled() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+                    })
+                .OnCheckStateChanged_Lambda([this](ECheckBoxState State)
+                    {
+                        if (State == ECheckBoxState::Checked && !GetHDRISkyboxTexture())
+                        {
+                            // 尚未选择 HDRI：打开选择器而不启用
+                            if (HDRIPickerAnchor.IsValid()) HDRIPickerAnchor->SetIsOpen(true);
+                            return;
+                        }
+                        SetHDRISkyboxEnabled(State == ECheckBoxState::Checked);
+                    })
+                [
+                    SNew(STextBlock).Text(SC_LOCTEXT(HDRIEnableLabel, "HDRI Skybox"))
+                ]
+            ]
+            + SHorizontalBox::Slot().AutoWidth().Padding(8.f, 0.f, 0.f, 0.f)
+            [
+                SAssignNew(HDRIPickerAnchor, SMenuAnchor)
+                .Placement(MenuPlacement_BelowAnchor)
+                .OnGetMenuContent_Lambda([this]() { return MakeHDRIAssetPicker(); })
+                [
+                    SNew(SButton)
+                    .OnClicked_Lambda([this]() -> FReply
+                        {
+                            if (HDRIPickerAnchor.IsValid()) HDRIPickerAnchor->SetIsOpen(true);
+                            return FReply::Handled();
+                        })
+                    [
+                        SNew(STextBlock).Text(SC_LOCTEXT(HDRISelectLabel, "Select HDRI..."))
+                    ]
+                ]
+            ]
+            + SHorizontalBox::Slot().FillWidth(1.f)
+        ];
+
+    TSharedRef<SWidget> ViewportWithToolbar =
+        SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight() [ HDRIToolbar ]
+        + SVerticalBox::Slot().FillHeight(1.f) [ Viewport ];
+
     TSharedRef<SAssetDropTarget> DropTarget =
         SNew(SAssetDropTarget)
         .bSupportsMultiDrop(true)
         .OnAssetsDropped_Lambda([this](const FDragDropEvent& E, TArrayView<FAssetData> InAssets)
             { OnAssetsDropped(E, InAssets); })
-        [Viewport];
+        [ViewportWithToolbar];
 
     return MakeTab(ViewportTabId, SC_LOCTEXT(ViewportTabLabel, "Viewport"), DropTarget);
 }
@@ -198,6 +262,97 @@ TSharedRef<SDockTab> FScenecapsEditorToolkit::SpawnTab_Details(const FSpawnTabAr
 TSharedRef<SDockTab> FScenecapsEditorToolkit::MakeTab(const FName&, const FText& Label, TSharedRef<SWidget> Content)
 {
     return SNew(SDockTab).TabRole(ETabRole::PanelTab).Label(Label)[Content];
+}
+
+// ---------- 视口 HDRI 天空盒 ----------
+
+UScenecapsViewportSettings* FScenecapsEditorToolkit::GetViewportSettings() const
+{
+    return GetMutableDefault<UScenecapsViewportSettings>();
+}
+
+bool FScenecapsEditorToolkit::IsHDRISkyboxEnabled() const
+{
+    const UScenecapsViewportSettings* Settings = GetViewportSettings();
+    return Settings->bEnableHDRISkybox && !Settings->HDRISkyboxTexture.IsNull();
+}
+
+UTextureCube* FScenecapsEditorToolkit::GetHDRISkyboxTexture() const
+{
+    return GetViewportSettings()->HDRISkyboxTexture.LoadSynchronous();
+}
+
+void FScenecapsEditorToolkit::SetHDRISkyboxEnabled(bool bEnabled)
+{
+    UScenecapsViewportSettings* Settings = GetViewportSettings();
+    Settings->bEnableHDRISkybox = bEnabled && !Settings->HDRISkyboxTexture.IsNull();
+    Settings->SaveConfig();
+    ApplyHDRISkyboxToPreview();
+}
+
+void FScenecapsEditorToolkit::SetHDRISkyboxTexture(UTextureCube* InTexture)
+{
+    UScenecapsViewportSettings* Settings = GetViewportSettings();
+    Settings->HDRISkyboxTexture = InTexture;
+
+    // 没有 HDRI 时强制关闭；选择有效 HDRI 后自动启用
+    Settings->bEnableHDRISkybox = (InTexture != nullptr);
+    Settings->SaveConfig();
+    ApplyHDRISkyboxToPreview();
+}
+
+void FScenecapsEditorToolkit::ApplyHDRISkyboxToPreview()
+{
+    const UScenecapsViewportSettings* Settings = GetViewportSettings();
+    const bool bEnabled = IsHDRISkyboxEnabled();
+    UTextureCube* HDRI = bEnabled ? Settings->HDRISkyboxTexture.LoadSynchronous() : nullptr;
+
+    if (PreviewScene.IsValid())
+    {
+        if (USkyLightComponent* SkyLight = PreviewScene->SkyLight)
+        {
+            if (bEnabled && HDRI)
+            {
+                SkyLight->SetVisibility(true);
+                SkyLight->SetIntensity(Settings->HDRISkyboxIntensity);
+                SkyLight->SourceType = SLS_SpecifiedCubemap;
+                SkyLight->SetCubemap(HDRI);
+            }
+            else
+            {
+                SkyLight->SetVisibility(false);
+                SkyLight->SetIntensity(0.0f);
+            }
+        }
+    }
+
+    if (TSharedPtr<SScenecapsEditorViewport> Viewport = ViewportWidget.Pin())
+    {
+        if (TSharedPtr<FScenecapsEditorViewportClient> Client = Viewport->GetScenecapsViewportClient())
+        {
+            Client->GetEngineShowFlagsPublic()->SetSkyLighting(bEnabled);
+            Client->RequestRedraw();
+        }
+    }
+}
+
+TSharedRef<SWidget> FScenecapsEditorToolkit::MakeHDRIAssetPicker()
+{
+    FAssetPickerConfig Config;
+    Config.Filter.ClassPaths.Add(UTextureCube::StaticClass()->GetClassPathName());
+    Config.SelectionMode = ESelectionMode::Single;
+    Config.OnAssetSelected = FOnAssetSelected::CreateSP(this, &FScenecapsEditorToolkit::HandleHDRIAssetSelected);
+
+    return FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser").Get().CreateAssetPicker(Config);
+}
+
+void FScenecapsEditorToolkit::HandleHDRIAssetSelected(const FAssetData& AssetData)
+{
+    SetHDRISkyboxTexture(Cast<UTextureCube>(AssetData.GetAsset()));
+    if (HDRIPickerAnchor.IsValid())
+    {
+        HDRIPickerAnchor->SetIsOpen(false);
+    }
 }
 
 void FScenecapsEditorToolkit::SetPreviewVariant(FName InVariant)

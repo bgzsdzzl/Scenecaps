@@ -8,6 +8,7 @@
 #include "CollisionQueryParams.h"
 #include "Framework/Application/SlateApplication.h"
 #include "ScenecapsAsset.h"
+#include "ScenecapsViewportConfig.h"
 
 FScenecapsEditorViewportClient::FScenecapsEditorViewportClient(
     FPreviewScene* InPreviewScene,
@@ -28,8 +29,10 @@ FScenecapsEditorViewportClient::FScenecapsEditorViewportClient(
 
     SetRealtime(false);
 
-    // Disable sky/atmosphere rendering in the viewport
-    EngineShowFlags.SetSkyLighting(false);
+    // HDRI 天空盒默认关闭；仅在用户已保存有效 HDRI 配置时开启天空渲染
+    const UScenecapsViewportSettings* ViewportSettings = GetDefault<UScenecapsViewportSettings>();
+    const bool bUseHDRISkybox = ViewportSettings->bEnableHDRISkybox && !ViewportSettings->HDRISkyboxTexture.IsNull();
+    EngineShowFlags.SetSkyLighting(bUseHDRISkybox);
 
     SetRealtime(false);
 
@@ -138,6 +141,11 @@ void FScenecapsEditorViewportClient::TrackingStopped()
         }
         bIsTransacting = false;
     }
+}
+
+void FScenecapsEditorViewportClient::RequestRedraw()
+{
+    Invalidate();
 }
 
 void FScenecapsEditorViewportClient::FocusViewportOnBox(const FBox& Box, bool bInstant)

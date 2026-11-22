@@ -19,6 +19,7 @@ class UWorld;
 class AActor;
 class UMaterialInterface;
 class UTextureRenderTarget2D;
+class UTextureCube;
 
 // Viewport render mode
 UENUM(BlueprintType)
@@ -169,6 +170,18 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Render", config)
     FLinearColor BackgroundColor = FLinearColor(0.15f, 0.15f, 0.15f, 1.0f);
+
+    // ---- HDRI Skybox（默认关闭，必须手动选择 HDRI 贴图后才会启用）----
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Render|HDRI Skybox", config)
+    bool bEnableHDRISkybox = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Render|HDRI Skybox", config)
+    TSoftObjectPtr<UTextureCube> HDRISkyboxTexture;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Render|HDRI Skybox", config,
+        meta = (ClampMin = "0.0", UIMin = "0.0"))
+    float HDRISkyboxIntensity = 1.0f;
 
     // ---- Camera ----
 

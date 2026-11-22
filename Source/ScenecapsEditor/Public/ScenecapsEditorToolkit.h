@@ -19,6 +19,8 @@ class IStructureDetailsView;
 class FStructOnScope;
 class SBox;
 class UScenecapsViewportSettings;
+class UTextureCube;
+class SMenuAnchor;
 
 class SCENECAPSEDITOR_API FScenecapsEditorToolkit : public FAssetEditorToolkit
 {
@@ -73,8 +75,19 @@ TWeakPtr<SScenecapsEditorViewport> GetViewportWidget() const { return ViewportWi
 
     void UpdatePreviewActor(const FGuid& EntryId);
 
+    // ---- 视口 HDRI 天空盒 ----
+
+    bool IsHDRISkyboxEnabled() const;
+    void SetHDRISkyboxEnabled(bool bEnabled);
+    UTextureCube* GetHDRISkyboxTexture() const;
+    void SetHDRISkyboxTexture(UTextureCube* InTexture);
+    void ApplyHDRISkyboxToPreview();
+
 private:
     TSharedRef<SDockTab> SpawnTab_Viewport(const FSpawnTabArgs& Args);
+    TSharedRef<SWidget> MakeHDRIAssetPicker();
+    void HandleHDRIAssetSelected(const FAssetData& AssetData);
+    UScenecapsViewportSettings* GetViewportSettings() const;
     TSharedRef<SDockTab> SpawnTab_Outliner(const FSpawnTabArgs& Args);
     TSharedRef<SDockTab> SpawnTab_Details(const FSpawnTabArgs& Args);
     TSharedRef<SDockTab> MakeTab(const FName& TabId, const FText& Label, TSharedRef<SWidget> Content);
@@ -97,6 +110,8 @@ private:
     TSharedPtr<SBox>    DetailsHost;
     TSharedPtr<SWidget> DetailsEntryWidget;
     TSharedPtr<SWidget> DetailsAssetWidget;
+
+    TSharedPtr<SMenuAnchor> HDRIPickerAnchor;
 
     TSharedPtr<FStructOnScope> DetailsStructScope;
     TSharedPtr<FStructOnScope> BatchDetailsScope;
