@@ -116,8 +116,9 @@ static FVector LerpVector(const FVector& A, const FVector& B, float Alpha) { ret
 static FLinearColor LerpColor(const FLinearColor& A, const FLinearColor& B, float Alpha) { return FMath::Lerp(A, B, Alpha); }
 static FTransform LerpTransform(const FTransform& A, const FTransform& B, float Alpha)
 {
+    // FMath::Lerp 对四元数是线性插值，结果不是单位四元数，会造成缩放/旋转异常；使用 Slerp
     return FTransform(
-        FMath::Lerp(A.GetRotation(), B.GetRotation(), Alpha),
+        FQuat::Slerp(A.GetRotation().GetNormalized(), B.GetRotation().GetNormalized(), Alpha),
         FMath::Lerp(A.GetLocation(), B.GetLocation(), Alpha),
         FMath::Lerp(A.GetScale3D(), B.GetScale3D(), Alpha)
     );
@@ -307,7 +308,8 @@ TArray<AActor*> UScenecapsAsset::SpawnCollectionEx(UObject* WorldContextObject, 
             // ★ 变体应用：所有下游都基于实际使用的 Entry
             const FScenecapsEntry Entry = ApplyVariantToEntry(BaseEntry, VariantName);
 
-            const FTransform FinalWorld = ParentWorld * Entry.RelativeTransform;
+            // UE 的 FTransform 组合语义：A*B = 先 A 后 B，因此局部变换必须写在父变换左侧
+            const FTransform FinalWorld = Entry.RelativeTransform * ParentWorld;
             const bool bShouldSpawn = (Entry.bVisible || bIncludeHidden) && !bParentSkipped;
 
             if (bShouldSpawn && !Entry.Asset.IsNull())
@@ -438,7 +440,7 @@ TArray<FTransform> UScenecapsAsset::GenerateProceduralTransforms(
                     Center.Z
                 );
                 FTransform LocalTransform(LocalPos);
-                Transforms.Add(WorldTransform * Entry.RelativeTransform * LocalTransform);
+                Transforms.Add(LocalTransform * Entry.RelativeTransform * WorldTransform);
             }
         }
         break;
@@ -508,7 +510,7 @@ TArray<FTransform> UScenecapsAsset::GenerateProceduralTransforms(
                     Grid[Gy * GridW + Gx] = Candidate;
                     FVector LocalPos(Candidate.X, Candidate.Y, Center.Z);
                     FTransform LocalTransform(LocalPos);
-                    Transforms.Add(WorldTransform * Entry.RelativeTransform * LocalTransform);
+                    Transforms.Add(LocalTransform * Entry.RelativeTransform * WorldTransform);
                     Found = true;
                     break;
                 }
@@ -545,7 +547,7 @@ TArray<FTransform> UScenecapsAsset::GenerateProceduralTransforms(
                 Center.Z
             );
             FTransform LocalTransform(LocalPos);
-            Transforms.Add(WorldTransform * Entry.RelativeTransform * LocalTransform);
+            Transforms.Add(LocalTransform * Entry.RelativeTransform * WorldTransform);
         }
         break;
     }
@@ -567,7 +569,7 @@ TArray<FTransform> UScenecapsAsset::GenerateProceduralTransforms(
                     Center.Z
                 );
                 FTransform LocalTransform(LocalPos);
-                Transforms.Add(WorldTransform * Entry.RelativeTransform * LocalTransform);
+                Transforms.Add(LocalTransform * Entry.RelativeTransform * WorldTransform);
             }
         }
         break;

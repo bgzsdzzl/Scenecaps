@@ -334,6 +334,10 @@ void FScenecapsDataDrivenEntryHandler::ResolveClass(FScenecapsSCXEntry& Entry)
             bool bFoundComponentProperty = false;
             for (TFieldIterator<FObjectProperty> It(Entry.ResolvedActorClass); It; ++It)
             {
+                // 必须匹配属性中指定的组件名，否则会把别的组件类的同名字段缓存下来，
+                // 运行时按组件名找到真正组件后用错误的 FProperty 偏移写内存
+                if (It->GetFName() != Prop.CachedComponentName) continue;
+
                 if (It->PropertyClass && It->PropertyClass->IsChildOf(UActorComponent::StaticClass()))
                 {
                     if (FProperty* FoundProp = FindFProperty<FProperty>(It->PropertyClass, Prop.CachedPropertyName))

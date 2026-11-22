@@ -188,18 +188,10 @@ bool FScenecapsEditorCommands::ExportToCustomBinary(UScenecapsAsset* Asset)
         WriteString(Entry.DisplayName);
         FileWriter->Serialize(&Entry.RelativeTransform, sizeof(Entry.RelativeTransform));
 
-        UClass* Cls = nullptr;
-        if (Entry.Asset.IsPending())
-            Entry.Asset.LoadSynchronous();
-        if (UObject* Obj = Entry.Asset.Get())
-        {
-            if (UClass* C = Cast<UClass>(Obj))
-                Cls = C;
-            else if (UBlueprint* BP = Cast<UBlueprint>(Obj))
-                Cls = BP->GeneratedClass;
-        }
-        FString ClassPath = Cls ? FSoftObjectPath(Cls).ToString() : FString();
-        WriteString(ClassPath);
+        // 写出条目的完整软对象路径。旧实现只写 Actor 类路径，
+        // 导致 StaticMesh / 材质 / 蓝图等条目导出后再导入时 Asset 为空、内容丢失
+        FString AssetPath = Entry.Asset.IsNull() ? FString() : Entry.Asset.ToSoftObjectPath().ToString();
+        WriteString(AssetPath);
 
         FString MatPath = Entry.MaterialOverride.IsNull() ? FString() : Entry.MaterialOverride.ToSoftObjectPath().ToString();
         WriteString(MatPath);
@@ -271,20 +263,33 @@ bool FScenecapsEditorCommands::ImportFromCustomBinary(UScenecapsAsset* Asset)
         FileReader->Serialize(&Value, sizeof(Value));
     };
     auto ReadString = [&](FString& OutStr) {
+        OutStr.Empty();
         int32 Len = 0;
         FileReader->Serialize(&Len, sizeof(Len));
-        if (Len > 0)
+        if (FileReader->IsError() || Len < 0 || Len > 1024 * 1024)
         {
-            int64 Need = static_cast<int64>(Len) * sizeof(TCHAR);
-            TArray<uint8> Bytes;
-            Bytes.AddUninitialized(Need);
-            FileReader->Serialize(Bytes.GetData(), Need);
-            OutStr = FString((TCHAR*)Bytes.GetData(), Len);
+            bSuccess = false;
+            return;
         }
-        else
+        if (Len == 0) return;
+
+        const int64 Need = static_cast<int64>(Len) * sizeof(TCHAR);
+        const int64 Remaining = FileReader->TotalSize() - FileReader->Tell();
+        if (Need > Remaining)
         {
-            OutStr.Empty();
+            bSuccess = false;
+            return;
         }
+
+        TArray<uint8> Bytes;
+        Bytes.SetNumUninitialized(static_cast<int32>(Need));
+        FileReader->Serialize(Bytes.GetData(), Need);
+        if (FileReader->IsError())
+        {
+            bSuccess = false;
+            return;
+        }
+        OutStr = FString(reinterpret_cast<const TCHAR*>(Bytes.GetData()), Len);
     };
 
     char Magic[4] = { 0 };
@@ -310,6 +315,12 @@ bool FScenecapsEditorCommands::ImportFromCustomBinary(UScenecapsAsset* Asset)
 
     int32 Count = 0;
     FileReader->Serialize(&Count, sizeof(Count));
+    if (FileReader->IsError() || Count < 0 || Count > 100000)
+    {
+        UE_LOG(LogScenecaps, Error, TEXT("[Scenecaps] Invalid entry count %d in custom binary: %s"), Count, *InFilename);
+        bSuccess = false;
+        Count = 0;
+    }
 
     TArray<FScenecapsEntry> NewEntries;
     NewEntries.Reserve(Count);
@@ -329,13 +340,12 @@ bool FScenecapsEditorCommands::ImportFromCustomBinary(UScenecapsAsset* Asset)
         ReadString(Entry.DisplayName);
         FileReader->Serialize(&Entry.RelativeTransform, sizeof(Entry.RelativeTransform));
 
-        FString ClassPath;
-        ReadString(ClassPath);
-        if (!ClassPath.IsEmpty())
+        FString AssetPath;
+        ReadString(AssetPath);
+        if (!AssetPath.IsEmpty())
         {
-            UClass* Cls = LoadObject<UClass>(nullptr, *ClassPath);
-            if (Cls)
-                Entry.Asset = Cls;
+            // 完整软对象路径同时兼容旧的纯类路径，缺失资产时 SpawnCollectionEx 会跳过
+            Entry.Asset = FSoftObjectPath(AssetPath);
         }
 
         FString MatPath;
@@ -354,6 +364,7 @@ bool FScenecapsEditorCommands::ImportFromCustomBinary(UScenecapsAsset* Asset)
             Entry.DataLayer = FSoftObjectPath(DLPath);
         }
 
+        if (FileReader->IsError()) bSuccess = false;
         if (!bSuccess) break;
 
         NewEntries.Add(MoveTemp(Entry));

@@ -50,6 +50,12 @@ void FScenecapsEditorModule::StartupModule()
 
 void FScenecapsEditorModule::ShutdownModule()
 {
+    // 与 StartupModule 中的注册对称，避免热重载/模块卸载后残留失效定义
+    if (UAssetDefinitionRegistry* Registry = UAssetDefinitionRegistry::Get())
+    {
+        Registry->UnregisterAssetDefinition(GetMutableDefault<UAssetDefinition_Scenecaps>());
+    }
+
     ScenecapsAssetCategories::GCategoryBit = 0;
     for (IConsoleObject* Cmd : RegisteredConsoleCommands)
     {

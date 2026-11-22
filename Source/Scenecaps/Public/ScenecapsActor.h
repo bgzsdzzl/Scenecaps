@@ -12,6 +12,31 @@ class USceneComponent;
 class UDataLayerAsset;
 class UScenecapsModifierManager;
 
+/** 已生成 Actor 与其来源条目的对应关系（用于精确应用变体插值 / Data Layer 清理） */
+USTRUCT()
+struct FScenecapsSpawnedEntry
+{
+    GENERATED_BODY()
+
+    UPROPERTY()
+    FGuid EntryId;
+
+    UPROPERTY()
+    TObjectPtr<AActor> Actor;
+
+    /** 生成时的世界变换与条目相对变换，用于过渡时还原父级世界变换 */
+    UPROPERTY()
+    FTransform SpawnTransform;
+
+    UPROPERTY()
+    FTransform BaseRelativeTransform;
+
+#if WITH_EDITORONLY_DATA
+    UPROPERTY()
+    TObjectPtr<UDataLayerAsset> AppliedDataLayer;
+#endif
+};
+
 UCLASS(BlueprintType, meta = (DisplayName = "Scene Collection"))
 class SCENECAPS_API AScenecapsActor : public AActor
 {
@@ -58,6 +83,9 @@ public:
 
     const TArray<TObjectPtr<AActor>>& GetSpawnedActors() const { return SpawnedActors; }
     int32 GetSpawnedCount() const { return SpawnedActors.Num(); }
+
+    /** 条目 ID -> 生成 Actor 的映射，供变体过渡精确应用 */
+    const TArray<FScenecapsSpawnedEntry>& GetSpawnedEntries() const { return SpawnedEntries; }
 
     // ---------- Runtime Blueprint API ----------
 
@@ -133,6 +161,9 @@ public:
 private:
     UPROPERTY()
     TArray<TObjectPtr<AActor>> SpawnedActors;
+
+    UPROPERTY(Transient)
+    TArray<FScenecapsSpawnedEntry> SpawnedEntries;
 
     UPROPERTY(VisibleAnywhere, Category = "Scene Collection")
     TObjectPtr<USceneComponent> SceneRoot;

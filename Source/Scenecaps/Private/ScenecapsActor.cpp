@@ -74,46 +74,70 @@ void AScenecapsActor::Rebuild()
         SpawnedActors.Add(Actor);
     }
 
-#if WITH_EDITOR
+    // 记录条目 -> Actor 映射，供变体过渡精确应用，并记录实际添加的 Data Layer
+    SpawnedEntries.Reserve(EntryToActor.Num());
     for (const TPair<FGuid, AActor*>& Pair : EntryToActor)
     {
         AActor* Actor = Pair.Value;
         if (!Actor) continue;
 
-        UDataLayerAsset* LayerToUse = nullptr;
-        if (const FScenecapsEntry* Entry = Asset->Entries.FindByPredicate(
-            [&](const FScenecapsEntry& X) { return X.EntryId == Pair.Key; }))
+        FScenecapsSpawnedEntry Record;
+        Record.EntryId = Pair.Key;
+        Record.Actor = Actor;
+        Record.SpawnTransform = Actor->GetActorTransform();
+
+        const FScenecapsEntry* SourceEntry = Asset->Entries.FindByPredicate(
+            [&](const FScenecapsEntry& X) { return X.EntryId == Pair.Key; });
+        if (SourceEntry)
         {
-            if (!Entry->DataLayer.IsNull())
+            Record.BaseRelativeTransform =
+                Asset->ApplyVariantToEntry(*SourceEntry, ActiveVariant).RelativeTransform;
+        }
+
+#if WITH_EDITOR
+        UDataLayerAsset* LayerToUse = nullptr;
+        if (SourceEntry)
+        {
+            if (!SourceEntry->DataLayer.IsNull())
             {
-                LayerToUse = Entry->DataLayer.LoadSynchronous();
+                LayerToUse = SourceEntry->DataLayer.LoadSynchronous();
             }
         }
         if (!LayerToUse) LayerToUse = CachedDataLayerAsset;
-        if (LayerToUse) ApplyDataLayerToActor(Actor, LayerToUse);
-    }
+        if (LayerToUse)
+        {
+            ApplyDataLayerToActor(Actor, LayerToUse);
+            Record.AppliedDataLayer = LayerToUse;
+        }
 #endif
+        SpawnedEntries.Add(Record);
+    }
 }
 
 void AScenecapsActor::Clear()
 {
+#if WITH_EDITOR
+    // 只移除本次重建实际添加过的 Data Layer，避免残留条目专属层
+    for (const FScenecapsSpawnedEntry& Record : SpawnedEntries)
+    {
+        if (!Record.AppliedDataLayer) continue;
+        if (AActor* Actor = Record.Actor.Get())
+        {
+            if (IsValid(Actor))
+            {
+                RemoveDataLayerFromActor(Actor, Record.AppliedDataLayer);
+            }
+        }
+    }
+#endif
+    SpawnedEntries.Empty();
+
     for (TObjectPtr<AActor>& Ptr : SpawnedActors)
     {
         if (AActor* Actor = Ptr.Get())
         {
             if (IsValid(Actor))
             {
-#if WITH_EDITOR
-                UDataLayerAsset* LayerToRemove = CachedDataLayerAsset;
-                if (!LayerToRemove && !TargetDataLayer.IsNull())
-                {
-                    LayerToRemove = TargetDataLayer.LoadSynchronous();
-                }
-                if (LayerToRemove)
-                {
-                    RemoveDataLayerFromActor(Actor, LayerToRemove);
-                }
-#endif
                 Actor->Destroy();
             }
         }
@@ -151,6 +175,9 @@ void AScenecapsActor::BeginPlay()
     {
         Rebuild();
     }
+#else
+    // Game 目标同样需要生成集合（运行时动态放置的 Actor 没有编辑器预生成的对象）
+    Rebuild();
 #endif
 }
 

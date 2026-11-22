@@ -35,8 +35,8 @@ TArray<FScenecapsBiomeEntry> UScenecapsBiomeAsset::QueryEntriesAtLocation(
         
         FHitResult HitResult;
         FCollisionQueryParams QueryParams;
-        QueryParams.AddIgnoredActor(Landscape);
-        
+        // 必须命中 Landscape 本身才能取得其表面法线；忽略它会让坡度永远为 0
+
         if (World->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
         {
             if (HitResult.bBlockingHit && HitResult.Normal.SizeSquared() > 0.0f)

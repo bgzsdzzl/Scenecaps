@@ -169,7 +169,9 @@ void UScenecapsVariantTransitionComponent::ApplyCurrentInterpolation()
         if (!TransitionAsset.IsValid()) return;
     }
 
-    float Alpha = bIsReversed ? (1.0f - CurrentAlpha) : CurrentAlpha;
+    // From/To 交换已经在下方 ApplyInterpolationTo* 中按 bIsReversed 处理，
+    // 这里再反转 Alpha 会造成反向播放时插值位置错误（双重反转）
+    const float Alpha = CurrentAlpha;
 
     if (UScenecapsAsset* Asset = Cast<UScenecapsAsset>(TransitionAsset.Get()))
     {
@@ -202,102 +204,94 @@ void UScenecapsVariantTransitionComponent::ApplyInterpolationToAsset(float Alpha
         EntryMap.Add(Entry.EntryId, Entry);
     }
 
-    // 遍历生成的 Actor 并应用插值
-    for (const TObjectPtr<AActor>& ActorPtr : SceneActor->GetSpawnedActors())
+    // 按 EntryId 精确匹配已生成的 Actor。旧实现让每个 Actor 应用全部条目，
+    // 结果是所有 Actor 最终都变成最后一个条目的变换与外观。
+    for (const FScenecapsSpawnedEntry& Spawned : SceneActor->GetSpawnedEntries())
     {
-        AActor* Actor = ActorPtr.Get();
-        if (!Actor || !IsValid(Actor)) continue;
+        AActor* Actor = Spawned.Actor.Get();
+        if (!IsValid(Actor)) continue;
 
-        // 尝试从 Actor 找到对应的 EntryId
-        // 这里需要一种映射方式：可以通过 Actor 的 tag 或名字匹配
-        // 简单做法：遍历所有插值条目，通过 Asset 引用匹配
-        for (const auto& Pair : EntryMap)
+        const FScenecapsInterpolatedEntry* InterpEntry = EntryMap.Find(Spawned.EntryId);
+        if (!InterpEntry) continue;
+
+        if (InterpEntry->RelativeTransform.IsValid())
         {
-            const FScenecapsInterpolatedEntry& InterpEntry = Pair.Value;
-            
-            // 检查 Actor 是否对应这个 Entry（通过 Asset 匹配）
-            // 注意：这是一个简化实现，实际可能需要更精确的映射
-            TArray<UPrimitiveComponent*> Prims;
-            Actor->GetComponents(Prims);
-            
-            for (UPrimitiveComponent* Prim : Prims)
+            // 由生成时的世界变换反推父级世界，再叠加插值后的相对变换，兼容嵌套条目
+            const FTransform ParentWorld =
+                Spawned.SpawnTransform * Spawned.BaseRelativeTransform.Inverse();
+            Actor->SetActorTransform(
+                InterpEntry->RelativeTransform * ParentWorld,
+                false, nullptr, ETeleportType::TeleportPhysics);
+        }
+
+        TArray<UPrimitiveComponent*> Prims;
+        Actor->GetComponents(Prims);
+
+        for (UPrimitiveComponent* Prim : Prims)
+        {
+            if (!Prim) continue;
+
+            Prim->SetVisibility(InterpEntry->bVisible, true);
+
+            if (InterpEntry->MaterialOverride.IsValid())
             {
-                if (!Prim) continue;
-
-                // 应用变换（相对变换需要转为世界变换）
-                // 这里假设 Actor 已经在正确的父级下，直接设置相对变换
-                if (InterpEntry.RelativeTransform.IsValid())
+                UMaterialInterface* Mat = InterpEntry->MaterialOverride.LoadSynchronous();
+                if (Mat)
                 {
-                    Prim->SetRelativeTransform(InterpEntry.RelativeTransform, false, nullptr, ETeleportType::TeleportPhysics);
-                }
-
-                // 应用可见性
-                Prim->SetVisibility(InterpEntry.bVisible, true);
-
-                // 应用材质覆盖
-                if (InterpEntry.MaterialOverride.IsValid())
-                {
-                    UMaterialInterface* Mat = InterpEntry.MaterialOverride.LoadSynchronous();
-                    if (Mat)
+                    if (UMeshComponent* MeshComp = Cast<UMeshComponent>(Prim))
                     {
-                        if (UMeshComponent* MeshComp = Cast<UMeshComponent>(Prim))
+                        const int32 SlotIdx = InterpEntry->MaterialSlotIndex;
+                        if (SlotIdx < 0)
                         {
-                            int32 SlotIdx = InterpEntry.MaterialSlotIndex;
-                            if (SlotIdx < 0)
+                            for (int32 i = 0; i < MeshComp->GetNumMaterials(); ++i)
                             {
-                                for (int32 i = 0; i < MeshComp->GetNumMaterials(); ++i)
-                                {
-                                    MeshComp->SetMaterial(i, Mat);
-                                }
+                                MeshComp->SetMaterial(i, Mat);
                             }
-                            else if (MeshComp->GetNumMaterials() > SlotIdx)
-                            {
-                                MeshComp->SetMaterial(SlotIdx, Mat);
-                            }
+                        }
+                        else if (MeshComp->GetNumMaterials() > SlotIdx)
+                        {
+                            MeshComp->SetMaterial(SlotIdx, Mat);
                         }
                     }
                 }
+            }
 
-                // 应用自定义参数到 CustomPrimitiveData
-                if (UMeshComponent* MeshComp = Cast<UMeshComponent>(Prim))
+            if (UMeshComponent* MeshComp = Cast<UMeshComponent>(Prim))
+            {
+                // CustomPrimitiveData 索引在所有参数类型之间共享，必须连续分配
+                int32 DataIndex = 0;
+                TArray<FName> Keys;
+                InterpEntry->FloatParams.GenerateKeyArray(Keys);
+                Keys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
+                for (const FName& Key : Keys)
                 {
-                    // FloatParams
-                    TArray<FName> FloatKeys;
-                    InterpEntry.FloatParams.GenerateKeyArray(FloatKeys);
-                    FloatKeys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
-                    for (int32 i = 0; i < FloatKeys.Num(); ++i)
-                    {
-                        MeshComp->SetCustomPrimitiveDataFloat(i, InterpEntry.FloatParams[FloatKeys[i]]);
-                    }
+                    MeshComp->SetCustomPrimitiveDataFloat(DataIndex++, InterpEntry->FloatParams.FindRef(Key));
+                }
 
-                    // VectorParams
-                    TArray<FName> VectorKeys;
-                    InterpEntry.VectorParams.GenerateKeyArray(VectorKeys);
-                    VectorKeys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
-                    for (int32 i = 0; i < VectorKeys.Num(); ++i)
-                    {
-                        const FVector& V = InterpEntry.VectorParams[VectorKeys[i]];
-                        MeshComp->SetCustomPrimitiveDataVector4(i, FVector4(V.X, V.Y, V.Z, 0.0f));
-                    }
+                Keys.Reset();
+                InterpEntry->VectorParams.GenerateKeyArray(Keys);
+                Keys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
+                for (const FName& Key : Keys)
+                {
+                    const FVector V = InterpEntry->VectorParams.FindRef(Key);
+                    MeshComp->SetCustomPrimitiveDataVector4(DataIndex++, FVector4(V.X, V.Y, V.Z, 0.0f));
+                }
 
-                    // ColorParams
-                    TArray<FName> ColorKeys;
-                    InterpEntry.ColorParams.GenerateKeyArray(ColorKeys);
-                    ColorKeys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
-                    for (int32 i = 0; i < ColorKeys.Num(); ++i)
-                    {
-                        const FLinearColor& C = InterpEntry.ColorParams[ColorKeys[i]];
-                        MeshComp->SetCustomPrimitiveDataVector4(i, FVector4(C.R, C.G, C.B, C.A));
-                    }
+                Keys.Reset();
+                InterpEntry->ColorParams.GenerateKeyArray(Keys);
+                Keys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
+                for (const FName& Key : Keys)
+                {
+                    const FLinearColor C = InterpEntry->ColorParams.FindRef(Key);
+                    MeshComp->SetCustomPrimitiveDataVector4(DataIndex++, FVector4(C.R, C.G, C.B, C.A));
+                }
 
-                    // BoolParams
-                    TArray<FName> BoolKeys;
-                    InterpEntry.BoolParams.GenerateKeyArray(BoolKeys);
-                    BoolKeys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
-                    for (int32 i = 0; i < BoolKeys.Num(); ++i)
-                    {
-                        MeshComp->SetCustomPrimitiveDataFloat(i, InterpEntry.BoolParams[BoolKeys[i]] ? 1.0f : 0.0f);
-                    }
+                Keys.Reset();
+                InterpEntry->BoolParams.GenerateKeyArray(Keys);
+                Keys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
+                for (const FName& Key : Keys)
+                {
+                    MeshComp->SetCustomPrimitiveDataFloat(DataIndex++, InterpEntry->BoolParams.FindRef(Key) ? 1.0f : 0.0f);
                 }
             }
         }
@@ -341,50 +335,30 @@ void UScenecapsVariantTransitionComponent::ApplyInterpolationToISM(float Alpha)
     for (UInstancedStaticMeshComponent* ISM : ISMs)
     {
         if (!ISM || !ISM->GetStaticMesh()) continue;
-        
-        int32 InstanceCount = ISM->GetInstanceCount();
+
         UStaticMesh* Mesh = ISM->GetStaticMesh();
-        
-        // 查找对应这个 Mesh 的插值条目
-        // 这里需要遍历所有 Entry 找到使用这个 Mesh 的
         for (const FScenecapsEntry& BaseEntry : Asset->Entries)
         {
             if (BaseEntry.Asset.IsPending()) continue;
             UObject* EntryAsset = BaseEntry.Asset.LoadSynchronous();
             if (!EntryAsset || Cast<UStaticMesh>(EntryAsset) != Mesh) continue;
-            
-            const FScenecapsInterpolatedEntry* InterpEntry = EntryMap.Find(BaseEntry.EntryId);
-            if (!InterpEntry) continue;
 
-            // 对于 ISM，通常每个 Entry 对应一个实例（如果是单实例）
-            // 或者多个实例（如果是程序化生成）
-            // 这里简化：假设每个 Entry 对应一个实例，按顺序更新
-            // 实际场景可能需要更复杂的映射逻辑
-            
-            // 尝试更新第一个实例作为演示
-            if (InstanceCount > 0)
+            const FScenecapsInterpolatedEntry* InterpEntry = EntryMap.Find(BaseEntry.EntryId);
+            if (!InterpEntry || ISM->GetInstanceCount() <= 0) continue;
+
+            // 旧实现用 FTransform(NewScale) 做可见性，会把实例位置/旋转重置到原点
+            FTransform NewTransform = InterpEntry->RelativeTransform;
+            NewTransform.SetScale3D(InterpEntry->bVisible ? NewTransform.GetScale3D() : FVector::ZeroVector);
+            ISM->UpdateInstanceTransform(0, NewTransform, true, true);
+
+            TArray<FName> FloatKeys;
+            InterpEntry->FloatParams.GenerateKeyArray(FloatKeys);
+            FloatKeys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
+            for (int32 i = 0; i < FloatKeys.Num() && i < ISM->NumCustomDataFloats; ++i)
             {
-                FTransform InstanceTransform;
-                if (ISM->GetInstanceTransform(0, InstanceTransform, true))
-                {
-                    // 应用相对变换（这里简化处理）
-                    FTransform NewTransform = InterpEntry->RelativeTransform;
-                    ISM->UpdateInstanceTransform(0, NewTransform, true, true);
-                }
-                
-                // 应用可见性（通过 scale 隐藏/显示）
-                FVector NewScale = InterpEntry->bVisible ? FVector(1.0f) : FVector(0.0f);
-                ISM->UpdateInstanceTransform(0, FTransform(NewScale), true, false);
-                
-                // 应用自定义参数
-                TArray<FName> FloatKeys;
-                InterpEntry->FloatParams.GenerateKeyArray(FloatKeys);
-                FloatKeys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
-                for (int32 i = 0; i < FloatKeys.Num(); ++i)
-                {
-                    ISM->SetCustomDataValue(0, i, InterpEntry->FloatParams[FloatKeys[i]], true);
-                }
+                ISM->SetCustomDataValue(0, i, InterpEntry->FloatParams.FindRef(FloatKeys[i]), true);
             }
+            break; // 一个 ISM 只对应一个条目，避免多个条目反复覆盖实例 0
         }
     }
 
@@ -392,39 +366,29 @@ void UScenecapsVariantTransitionComponent::ApplyInterpolationToISM(float Alpha)
     for (UHierarchicalInstancedStaticMeshComponent* HISM : HISMs)
     {
         if (!HISM || !HISM->GetStaticMesh()) continue;
-        
-        int32 InstanceCount = HISM->GetInstanceCount();
+
         UStaticMesh* Mesh = HISM->GetStaticMesh();
-        
         for (const FScenecapsEntry& BaseEntry : Asset->Entries)
         {
             if (BaseEntry.Asset.IsPending()) continue;
             UObject* EntryAsset = BaseEntry.Asset.LoadSynchronous();
             if (!EntryAsset || Cast<UStaticMesh>(EntryAsset) != Mesh) continue;
-            
-            const FScenecapsInterpolatedEntry* InterpEntry = EntryMap.Find(BaseEntry.EntryId);
-            if (!InterpEntry) continue;
 
-            if (InstanceCount > 0)
+            const FScenecapsInterpolatedEntry* InterpEntry = EntryMap.Find(BaseEntry.EntryId);
+            if (!InterpEntry || HISM->GetInstanceCount() <= 0) continue;
+
+            FTransform NewTransform = InterpEntry->RelativeTransform;
+            NewTransform.SetScale3D(InterpEntry->bVisible ? NewTransform.GetScale3D() : FVector::ZeroVector);
+            HISM->UpdateInstanceTransform(0, NewTransform, true, true);
+
+            TArray<FName> FloatKeys;
+            InterpEntry->FloatParams.GenerateKeyArray(FloatKeys);
+            FloatKeys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
+            for (int32 i = 0; i < FloatKeys.Num() && i < HISM->NumCustomDataFloats; ++i)
             {
-                FTransform InstanceTransform;
-                if (HISM->GetInstanceTransform(0, InstanceTransform, true))
-                {
-                    FTransform NewTransform = InterpEntry->RelativeTransform;
-                    HISM->UpdateInstanceTransform(0, NewTransform, true, true);
-                }
-                
-                FVector NewScale = InterpEntry->bVisible ? FVector(1.0f) : FVector(0.0f);
-                HISM->UpdateInstanceTransform(0, FTransform(NewScale), true, false);
-                
-                TArray<FName> FloatKeys;
-                InterpEntry->FloatParams.GenerateKeyArray(FloatKeys);
-                FloatKeys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
-                for (int32 i = 0; i < FloatKeys.Num(); ++i)
-                {
-                    HISM->SetCustomDataValue(0, i, InterpEntry->FloatParams[FloatKeys[i]], true);
-                }
+                HISM->SetCustomDataValue(0, i, InterpEntry->FloatParams.FindRef(FloatKeys[i]), true);
             }
+            break;
         }
     }
     

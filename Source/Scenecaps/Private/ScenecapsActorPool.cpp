@@ -47,7 +47,7 @@ AActor* UScenecapsActorPoolComponent::AcquireActor(FName PoolKey, const FTransfo
     // 查找可用的空闲 Actor
     for (FScenecapsPooledActor& Pooled : PooledActors)
     {
-        if (!Pooled.bInUse && Pooled.PoolKey == PoolKey && Pooled.Actor && Pooled.Actor->IsValidLowLevel())
+        if (!Pooled.bInUse && Pooled.PoolKey == PoolKey && IsValid(Pooled.Actor))
         {
             Pooled.bInUse = true;
             Pooled.LastUsedTime = FPlatformTime::Seconds();

@@ -76,42 +76,42 @@ void ApplyEntryOverrides(AActor* Actor, const FScenecapsSpawnContext& Context)
         // 自定义参数：应用到 UMeshComponent 的 PerInstanceCustomData / CustomPrimitiveData
         if (UMeshComponent* MeshComp = Cast<UMeshComponent>(Prim))
         {
-            // FloatParams -> SetCustomPrimitiveDataFloat (稳定排序后的索引)
+            // CustomPrimitiveData 是单一扁平数组，四类参数必须分配互不重叠的槽位，
+            // 否则 Float/Bool 与 Vector/Color 会互相覆盖
+            int32 DataIndex = 0;
+
             TArray<FName> FloatKeys;
             Context.FloatParams.GenerateKeyArray(FloatKeys);
             FloatKeys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
-            for (int32 i = 0; i < FloatKeys.Num(); ++i)
+            for (const FName& Key : FloatKeys)
             {
-                MeshComp->SetCustomPrimitiveDataFloat(i, Context.FloatParams[FloatKeys[i]]);
+                MeshComp->SetCustomPrimitiveDataFloat(DataIndex++, Context.FloatParams[Key]);
             }
 
-            // VectorParams -> SetCustomPrimitiveDataVector4
             TArray<FName> VectorKeys;
             Context.VectorParams.GenerateKeyArray(VectorKeys);
             VectorKeys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
-            for (int32 i = 0; i < VectorKeys.Num(); ++i)
+            for (const FName& Key : VectorKeys)
             {
-                const FVector& V = Context.VectorParams[VectorKeys[i]];
-                MeshComp->SetCustomPrimitiveDataVector4(i, FVector4(V.X, V.Y, V.Z, 0.0f));
+                const FVector V = Context.VectorParams[Key];
+                MeshComp->SetCustomPrimitiveDataVector4(DataIndex++, FVector4(V.X, V.Y, V.Z, 0.0f));
             }
 
-            // ColorParams -> SetCustomPrimitiveDataVector4 (as LinearColor)
             TArray<FName> ColorKeys;
             Context.ColorParams.GenerateKeyArray(ColorKeys);
             ColorKeys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
-            for (int32 i = 0; i < ColorKeys.Num(); ++i)
+            for (const FName& Key : ColorKeys)
             {
-                const FLinearColor& C = Context.ColorParams[ColorKeys[i]];
-                MeshComp->SetCustomPrimitiveDataVector4(i, FVector4(C.R, C.G, C.B, C.A));
+                const FLinearColor C = Context.ColorParams[Key];
+                MeshComp->SetCustomPrimitiveDataVector4(DataIndex++, FVector4(C.R, C.G, C.B, C.A));
             }
 
-            // BoolParams -> SetCustomPrimitiveDataFloat (0 or 1)
             TArray<FName> BoolKeys;
             Context.BoolParams.GenerateKeyArray(BoolKeys);
             BoolKeys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
-            for (int32 i = 0; i < BoolKeys.Num(); ++i)
+            for (const FName& Key : BoolKeys)
             {
-                MeshComp->SetCustomPrimitiveDataFloat(i, Context.BoolParams[BoolKeys[i]] ? 1.0f : 0.0f);
+                MeshComp->SetCustomPrimitiveDataFloat(DataIndex++, Context.BoolParams[Key] ? 1.0f : 0.0f);
             }
         }
     }
