@@ -1,5 +1,7 @@
 # Scenecaps / 场景胶囊
 
+> 当前版本：**1.0.0**（正式版） · Unreal Engine 5.8+
+
 面向 Unreal Engine 5.8+ 的非破坏性场景集合与关卡组装插件。
 
 Scenecaps 以「场景集合资产」为核心，将关卡中的多个对象组织为可复用、可切换、可程序化生成的条目集合，并提供变体、批量实例化与运行时过渡能力。
@@ -32,6 +34,7 @@ Scenecaps 以「场景集合资产」为核心，将关卡中的多个对象组�
 | 修改器系统 / Modifier System | 基于阶段的可扩展修改器 |
 | 快照记录器 / Snapshot Recorder | 捕获关卡对象为场景集合 |
 | Actor 池 / Actor Pool | 运行时对象复用 |
+| HDRI 天空盒预览 | 资产编辑器视口手动选择 HDRI 后启用，默认关闭 |
 
 > [!NOTE]
 > Data Layer 的加载状态触发重建目前仅在编辑器中生效。Game 目标尚未提供等价的运行时 Data Layer 处理，运行时需通过显式调用触发重建。
@@ -98,6 +101,7 @@ Source/
 | [Pull Request 流程](docs/PR_PROCESS.md) | 分支、提交、审核与合并 |
 | [生成式 AI 使用方针](docs/AI_USAGE_POLICY.md) | AI 使用披露与审查 |
 | [AI Agent 使用指南](docs/AI_AGENTS_GUIDE.md) | Agent 行为边界与日志 |
+| [版本文档（1.0.0）](docs/Version/1.0.0/README.md) | 该版本的 API、ABI、教程与使用说明 |
 | [行为准则](CODE_OF_CONDUCT.md) | 协作行为标准 |
 | [更新日志](CHANGELOG.md) | 版本变更记录 |
 

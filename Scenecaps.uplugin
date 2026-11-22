@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
-	"Version": 1,
-	"VersionName": "0.9.0",
+	"Version": 100,
+	"VersionName": "1.0.0",
 	"FriendlyName": "Scenecaps",
 	"Description": "Non-destructive scene reference collection asset, compatible with Lumen distance fields.",
 	"Category": "Editing",
@@ -11,7 +11,7 @@
 	"MarketplaceURL": "",
 	"SupportURL": "https://github.com/bgzsdzzl/Scenecaps/issues",
 	"CanContainContent": false,
-	"IsBetaVersion": true,
+	"IsBetaVersion": false,
 	"Installed": false,
 	"EngineVersion": "5.8",
 	"SupportedTargetPlatforms": ["Win64", "Linux", "Mac"],
