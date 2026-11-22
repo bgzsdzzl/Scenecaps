@@ -1,10 +1,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UObject/StrongObjectPtr.h"
 #include "Modules/ModuleManager.h"
 
 class FScenecapsEditorToolkit;
 class IConsoleObject;
+class UScenecapsActorFactory;
 
 class FScenecapsEditorModule : public IModuleInterface
 {
@@ -28,4 +30,8 @@ private:
 
     /** 需要在 ShutdownModule 里反注册的命令句柄。 */
     TArray<IConsoleObject*> RegisteredConsoleCommands;
+
+    /** 显式注册的 Actor 工厂（本模块加载晚于引擎自动扫描，必须自己注册才能拖放） */
+    TStrongObjectPtr<UScenecapsActorFactory> RegisteredPlacementFactory;
+    TStrongObjectPtr<UScenecapsActorFactory> RegisteredLegacyFactory;
 };

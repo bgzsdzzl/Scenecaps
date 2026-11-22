@@ -1,6 +1,6 @@
 # Scenecaps / 场景胶囊
 
-> 当前版本：**1.0.0**（正式版） · Unreal Engine 5.8+
+> 当前版本：**1.0.1**（正式版） · Unreal Engine 5.8+
 
 面向 Unreal Engine 5.8+ 的非破坏性场景集合与关卡组装插件。
 
@@ -101,7 +101,8 @@ Source/
 | [Pull Request 流程](docs/PR_PROCESS.md) | 分支、提交、审核与合并 |
 | [生成式 AI 使用方针](docs/AI_USAGE_POLICY.md) | AI 使用披露与审查 |
 | [AI Agent 使用指南](docs/AI_AGENTS_GUIDE.md) | Agent 行为边界与日志 |
-| [版本文档（1.0.0）](docs/Version/1.0.0/README.md) | 该版本的 API、ABI、教程与使用说明 |
+| [版本文档（1.0.1）](docs/Version/1.0.1/README.md) | 该版本的 API、ABI、教程与使用说明 |
+| [版本文档（1.0.0）](docs/Version/1.0.0/README.md) | 首个正式发布版本的 API、ABI、教程与使用说明 |
 | [行为准则](CODE_OF_CONDUCT.md) | 协作行为标准 |
 | [更新日志](CHANGELOG.md) | 版本变更记录 |
 

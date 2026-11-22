@@ -59,6 +59,10 @@ void UScenecapsActorFactory::PostSpawnActor(UObject* Asset, AActor* NewActor)
     AScenecapsActor* Container = Cast<AScenecapsActor>(NewActor);
     if (!SceneAsset || !Container) return;
 
+    // PostSpawnActor 在 UE 5.8 的拖放路径中会被调用两次（CreateActor 与 PostPlaceAsset），
+    // 这里做幂等保护，避免重建两次导致生成的 Actor 被重复销毁/创建。
+    if (Container->GetCollectionAsset() == SceneAsset) return;
+
     Container->CollectionAsset = SceneAsset;
     Container->Rebuild();
 

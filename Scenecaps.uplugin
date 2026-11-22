@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
-	"Version": 100,
-	"VersionName": "1.0.0",
+	"Version": 101,
+	"VersionName": "1.0.1",
 	"FriendlyName": "Scenecaps",
 	"Description": "Non-destructive scene reference collection asset, compatible with Lumen distance fields.",
 	"Category": "Editing",

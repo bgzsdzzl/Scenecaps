@@ -7,6 +7,14 @@
 
 ---
 
+## [1.0.1] - 2026-11-22
+
+### 修复
+
+- 紧急修复：场景集合资产无法从内容浏览器拖入关卡。原因是编辑器模块在 `PostEngineInit` 加载，晚于引擎自动扫描，导致 `UScenecapsActorFactory` 未注册；现显式注册到 `UPlacementSubsystem` 与 `GEditor->ActorFactories`，并在关闭时对称注销
+
+---
+
 ## [1.0.0] - 2026-11-22
 
 首个正式发布版本。版本文档（API、ABI、教程、使用说明）见 [docs/Version/1.0.0](docs/Version/1.0.0/README.md)。

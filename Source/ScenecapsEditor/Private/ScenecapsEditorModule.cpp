@@ -12,6 +12,8 @@
 #include "ScenecapsModule.h"
 #include "ScenecapsAssetCategories.h"
 #include "AssetDefinitionRegistry.h"
+#include "Subsystems/PlacementSubsystem.h"
+#include "Factories/AssetFactoryInterface.h"
 
 #include "Widgets/SWindow.h"
 #include "Framework/Application/SlateApplication.h"
@@ -44,12 +46,51 @@ void FScenecapsEditorModule::StartupModule()
             SC_LOCTEXT(ScenecapsCategory, "Scenecaps"));
     }
 
+    // 本模块在 PostEngineInit 加载，晚于引擎的 ActorFactory 自动扫描，
+    // 因此必须显式注册，否则内容浏览器无法把资产拖入关卡生成容器 Actor。
+    if (GEditor)
+    {
+        // ① 关卡拖放真正走的路径：UPlacementSubsystem 的工厂注册表
+        if (UPlacementSubsystem* Placement = GEditor->GetEditorSubsystem<UPlacementSubsystem>())
+        {
+            if (!Placement->GetAssetFactoryFromFactoryClass(UScenecapsActorFactory::StaticClass()))
+            {
+                UScenecapsActorFactory* Factory = NewObject<UScenecapsActorFactory>();
+                Placement->RegisterAssetFactory(TScriptInterface<IAssetFactoryInterface>(Factory));
+                RegisteredPlacementFactory.Reset(Factory);
+            }
+        }
+
+        // ② 旧路径（右键 Add Actor / 放置模式 / 拖放预览等）仍使用 GEditor->ActorFactories
+        if (!GEditor->FindActorFactoryByClass(UScenecapsActorFactory::StaticClass()))
+        {
+            UScenecapsActorFactory* Factory = NewObject<UScenecapsActorFactory>();
+            GEditor->ActorFactories.Add(Factory);
+            RegisteredLegacyFactory.Reset(Factory);
+        }
+    }
+
     RegisterContentBrowserMenus();
     RegisterConsoleCommands();
 }
 
 void FScenecapsEditorModule::ShutdownModule()
 {
+    if (GEditor)
+    {
+        if (UPlacementSubsystem* Placement = GEditor->GetEditorSubsystem<UPlacementSubsystem>())
+        {
+            if (UScenecapsActorFactory* Factory = RegisteredPlacementFactory.Get())
+            {
+                Placement->UnregisterAssetFactory(TScriptInterface<IAssetFactoryInterface>(Factory));
+                RegisteredPlacementFactory.Reset();
+            }
+        }
+        GEditor->ActorFactories.RemoveAll([](const UActorFactory* F)
+            { return F && F->IsA<UScenecapsActorFactory>(); });
+        RegisteredLegacyFactory.Reset();
+    }
+
     // 与 StartupModule 中的注册对称，避免热重载/模块卸载后残留失效定义
     if (UAssetDefinitionRegistry* Registry = UAssetDefinitionRegistry::Get())
     {
