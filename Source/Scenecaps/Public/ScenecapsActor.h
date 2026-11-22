@@ -87,6 +87,10 @@ public:
     /** 条目 ID -> 生成 Actor 的映射，供变体过渡精确应用 */
     const TArray<FScenecapsSpawnedEntry>& GetSpawnedEntries() const { return SpawnedEntries; }
 
+    /** 由 SpawnCollectionAsISM/HISM 写入，供变体过渡定位批量实例容器 */
+    void SetISMContainerActor(AActor* InActor);
+    AActor* GetISMContainerActor() const;
+
     // ---------- Runtime Blueprint API ----------
 
     /** 获取当前引用的 Collection Asset */
@@ -164,6 +168,10 @@ private:
 
     UPROPERTY(Transient)
     TArray<FScenecapsSpawnedEntry> SpawnedEntries;
+
+    /** 批量实例化容器，由 SpawnCollectionAsISM/HISM 关联 */
+    UPROPERTY(Transient)
+    TObjectPtr<AActor> ISMContainerActor;
 
     UPROPERTY(VisibleAnywhere, Category = "Scene Collection")
     TObjectPtr<USceneComponent> SceneRoot;

@@ -29,6 +29,7 @@ void UScenecapsISMComponent::RegisterContainerActor(AActor* ContainerActor)
 
     RegisteredISMs.Empty();
     RegisteredHISMs.Empty();
+    EntryBindings.Empty();
 
     // Get all ISM components (including HISM since it derives from ISM)
     TArray<UInstancedStaticMeshComponent*> AllISMs;
@@ -58,6 +59,31 @@ TArray<UInstancedStaticMeshComponent*> UScenecapsISMComponent::GetRegisteredISMs
 TArray<UHierarchicalInstancedStaticMeshComponent*> UScenecapsISMComponent::GetRegisteredHISMs() const
 {
     return RegisteredHISMs;
+}
+
+void UScenecapsISMComponent::RegisterEntryInstance(
+    FGuid EntryId,
+    UInstancedStaticMeshComponent* ISM,
+    int32 InstanceIndex,
+    const FTransform& SpawnTransform,
+    const FTransform& BaseRelativeTransform,
+    const TArray<float>& BaseCustomData)
+{
+    if (!EntryId.IsValid() || !ISM || InstanceIndex < 0) return;
+
+    FScenecapsISMEntryBinding Binding;
+    Binding.EntryId = EntryId;
+    Binding.ISM = ISM;
+    Binding.InstanceIndex = InstanceIndex;
+    Binding.SpawnTransform = SpawnTransform;
+    Binding.BaseRelativeTransform = BaseRelativeTransform;
+    Binding.BaseCustomData = BaseCustomData;
+    EntryBindings.Add(MoveTemp(Binding));
+}
+
+int32 UScenecapsISMComponent::GetEntryBindingCount() const
+{
+    return EntryBindings.Num();
 }
 
 UInstancedStaticMeshComponent* UScenecapsISMComponent::FindISMByMesh(UStaticMesh* Mesh) const

@@ -303,97 +303,137 @@ void UScenecapsVariantTransitionComponent::ApplyInterpolationToISM(float Alpha)
     AActor* Owner = GetOwner();
     if (!Owner) return;
 
-    UScenecapsISMComponent* Manager = Owner->FindComponentByClass<UScenecapsISMComponent>();
+    AScenecapsActor* SceneActor = Cast<AScenecapsActor>(Owner);
+
+    // 优先使用场景 Actor 记录的批量容器；兼容过渡组件与 ISM 管理组件同处一个 Actor 的用法
+    AActor* Host = SceneActor ? SceneActor->GetISMContainerActor() : nullptr;
+    UScenecapsISMComponent* Manager = Host ? Host->FindComponentByClass<UScenecapsISMComponent>() : nullptr;
+    if (!Manager)
+    {
+        Manager = Owner->FindComponentByClass<UScenecapsISMComponent>();
+    }
     if (!Manager) return;
 
     UScenecapsAsset* Asset = Cast<UScenecapsAsset>(TransitionAsset.Get());
     if (!Asset) return;
 
-    // 获取插值后的所有条目
+    const TArray<FScenecapsISMEntryBinding>& Bindings = Manager->GetEntryBindings();
+    if (Bindings.Num() == 0) return;
+
+    // EntryId -> 插值结果
     TArray<FScenecapsInterpolatedEntry> InterpolatedEntries = Asset->InterpolateAllEntries(
         bIsReversed ? ToVariant : FromVariant,
         bIsReversed ? FromVariant : ToVariant,
-        Alpha
-    );
-
-    // 建立 EntryId -> InterpolatedEntry 映射
+        Alpha);
     TMap<FGuid, FScenecapsInterpolatedEntry> EntryMap;
+    EntryMap.Reserve(InterpolatedEntries.Num());
     for (const FScenecapsInterpolatedEntry& Entry : InterpolatedEntries)
     {
         EntryMap.Add(Entry.EntryId, Entry);
     }
 
-    // 获取所有 ISM 和 HISM
-    TArray<UInstancedStaticMeshComponent*> ISMs = Manager->GetRegisteredISMs();
-    TArray<UHierarchicalInstancedStaticMeshComponent*> HISMs = Manager->GetRegisteredHISMs();
-
-    // 为每个 ISM/HISM 更新实例
-    // 注意：这里需要一种方式将 Entry 映射到具体的 ISM 实例索引
-    // 简化实现：假设 ISM 按 Entry 顺序创建，或者通过 Mesh 匹配
-    
-    // 更新 ISM 实例
-    for (UInstancedStaticMeshComponent* ISM : ISMs)
+    // 写入单个实例的插值参数；槽位布局与生成阶段的 EntryHandlers 保持一致
+    auto WriteInterpolatedCustomData = [](UInstancedStaticMeshComponent* ISM, int32 InstanceIndex,
+        const FScenecapsISMEntryBinding& Binding, const FScenecapsInterpolatedEntry& Interp)
     {
-        if (!ISM || !ISM->GetStaticMesh()) continue;
+        const int32 NumFloats = ISM->NumCustomDataFloats;
 
-        UStaticMesh* Mesh = ISM->GetStaticMesh();
-        for (const FScenecapsEntry& BaseEntry : Asset->Entries)
+        // 先恢复生成时的基线数据，再用插值参数覆盖对应槽位
+        for (int32 c = 0; c < Binding.BaseCustomData.Num() && c < NumFloats; ++c)
         {
-            if (BaseEntry.Asset.IsPending()) continue;
-            UObject* EntryAsset = BaseEntry.Asset.LoadSynchronous();
-            if (!EntryAsset || Cast<UStaticMesh>(EntryAsset) != Mesh) continue;
+            ISM->SetCustomDataValue(InstanceIndex, c, Binding.BaseCustomData[c], true);
+        }
 
-            const FScenecapsInterpolatedEntry* InterpEntry = EntryMap.Find(BaseEntry.EntryId);
-            if (!InterpEntry || ISM->GetInstanceCount() <= 0) continue;
+        int32 ParamIndex = 0;
+        TArray<FName> Keys;
 
-            // 旧实现用 FTransform(NewScale) 做可见性，会把实例位置/旋转重置到原点
-            FTransform NewTransform = InterpEntry->RelativeTransform;
-            NewTransform.SetScale3D(InterpEntry->bVisible ? NewTransform.GetScale3D() : FVector::ZeroVector);
-            ISM->UpdateInstanceTransform(0, NewTransform, true, true);
-
-            TArray<FName> FloatKeys;
-            InterpEntry->FloatParams.GenerateKeyArray(FloatKeys);
-            FloatKeys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
-            for (int32 i = 0; i < FloatKeys.Num() && i < ISM->NumCustomDataFloats; ++i)
+        Interp.FloatParams.GenerateKeyArray(Keys);
+        Keys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
+        for (const FName& Key : Keys)
+        {
+            const int32 FloatIndex = ParamIndex++;
+            if (FloatIndex < NumFloats)
             {
-                ISM->SetCustomDataValue(0, i, InterpEntry->FloatParams.FindRef(FloatKeys[i]), true);
+                ISM->SetCustomDataValue(InstanceIndex, FloatIndex, Interp.FloatParams.FindRef(Key), true);
             }
-            break; // 一个 ISM 只对应一个条目，避免多个条目反复覆盖实例 0
+        }
+
+        Keys.Reset();
+        Interp.VectorParams.GenerateKeyArray(Keys);
+        Keys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
+        for (const FName& Key : Keys)
+        {
+            const int32 VectorIndex = ParamIndex++;
+            const FVector V = Interp.VectorParams.FindRef(Key);
+            const float Components[4] = { V.X, V.Y, V.Z, 0.0f };
+            for (int32 c = 0; c < 4; ++c)
+            {
+                const int32 FloatIndex = VectorIndex * 4 + c;
+                if (FloatIndex < NumFloats)
+                {
+                    ISM->SetCustomDataValue(InstanceIndex, FloatIndex, Components[c], true);
+                }
+            }
+        }
+
+        Keys.Reset();
+        Interp.ColorParams.GenerateKeyArray(Keys);
+        Keys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
+        for (const FName& Key : Keys)
+        {
+            const int32 ColorIndex = ParamIndex++;
+            const FLinearColor C = Interp.ColorParams.FindRef(Key);
+            const float Components[4] = { C.R, C.G, C.B, C.A };
+            for (int32 c = 0; c < 4; ++c)
+            {
+                const int32 FloatIndex = ColorIndex * 4 + c;
+                if (FloatIndex < NumFloats)
+                {
+                    ISM->SetCustomDataValue(InstanceIndex, FloatIndex, Components[c], true);
+                }
+            }
+        }
+
+        Keys.Reset();
+        Interp.BoolParams.GenerateKeyArray(Keys);
+        Keys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
+        for (const FName& Key : Keys)
+        {
+            const int32 BoolIndex = ParamIndex++;
+            if (BoolIndex < NumFloats)
+            {
+                ISM->SetCustomDataValue(InstanceIndex, BoolIndex, Interp.BoolParams.FindRef(Key) ? 1.0f : 0.0f, true);
+            }
+        }
+    };
+
+    TSet<UHierarchicalInstancedStaticMeshComponent*> HISMsToRebuild;
+
+    for (const FScenecapsISMEntryBinding& Binding : Bindings)
+    {
+        UInstancedStaticMeshComponent* ISM = Binding.ISM.Get();
+        if (!IsValid(ISM)) continue;
+        if (Binding.InstanceIndex < 0 || Binding.InstanceIndex >= ISM->GetInstanceCount()) continue;
+
+        const FScenecapsInterpolatedEntry* Interp = EntryMap.Find(Binding.EntryId);
+        if (!Interp) continue;
+
+        // 由生成时快照反推父级世界，兼容嵌套层级与程序化多实例
+        const FTransform ParentWorld = Binding.SpawnTransform * Binding.BaseRelativeTransform.Inverse();
+        FTransform NewWorld = Interp->RelativeTransform * ParentWorld;
+        // 隐藏用零缩放，保留位置/旋转，避免实例跳到原点
+        NewWorld.SetScale3D(Interp->bVisible ? NewWorld.GetScale3D() : FVector::ZeroVector);
+        ISM->UpdateInstanceTransform(Binding.InstanceIndex, NewWorld, true, true);
+
+        WriteInterpolatedCustomData(ISM, Binding.InstanceIndex, Binding, *Interp);
+
+        if (UHierarchicalInstancedStaticMeshComponent* HISM = Cast<UHierarchicalInstancedStaticMeshComponent>(ISM))
+        {
+            HISMsToRebuild.Add(HISM);
         }
     }
 
-    // 更新 HISM 实例
-    for (UHierarchicalInstancedStaticMeshComponent* HISM : HISMs)
-    {
-        if (!HISM || !HISM->GetStaticMesh()) continue;
-
-        UStaticMesh* Mesh = HISM->GetStaticMesh();
-        for (const FScenecapsEntry& BaseEntry : Asset->Entries)
-        {
-            if (BaseEntry.Asset.IsPending()) continue;
-            UObject* EntryAsset = BaseEntry.Asset.LoadSynchronous();
-            if (!EntryAsset || Cast<UStaticMesh>(EntryAsset) != Mesh) continue;
-
-            const FScenecapsInterpolatedEntry* InterpEntry = EntryMap.Find(BaseEntry.EntryId);
-            if (!InterpEntry || HISM->GetInstanceCount() <= 0) continue;
-
-            FTransform NewTransform = InterpEntry->RelativeTransform;
-            NewTransform.SetScale3D(InterpEntry->bVisible ? NewTransform.GetScale3D() : FVector::ZeroVector);
-            HISM->UpdateInstanceTransform(0, NewTransform, true, true);
-
-            TArray<FName> FloatKeys;
-            InterpEntry->FloatParams.GenerateKeyArray(FloatKeys);
-            FloatKeys.Sort([](const FName& A, const FName& B) { return A.FastLess(B); });
-            for (int32 i = 0; i < FloatKeys.Num() && i < HISM->NumCustomDataFloats; ++i)
-            {
-                HISM->SetCustomDataValue(0, i, InterpEntry->FloatParams.FindRef(FloatKeys[i]), true);
-            }
-            break;
-        }
-    }
-    
-    // 如果有 HISM，重建树以更新剔除
-    for (UHierarchicalInstancedStaticMeshComponent* HISM : HISMs)
+    for (UHierarchicalInstancedStaticMeshComponent* HISM : HISMsToRebuild)
     {
         if (HISM)
         {

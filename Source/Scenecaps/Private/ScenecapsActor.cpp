@@ -338,6 +338,16 @@ void AScenecapsActor::RemoveDataLayerFromActor(AActor* Actor, UDataLayerAsset* L
 
 #endif
 
+void AScenecapsActor::SetISMContainerActor(AActor* InActor)
+{
+    ISMContainerActor = InActor;
+}
+
+AActor* AScenecapsActor::GetISMContainerActor() const
+{
+    return ISMContainerActor;
+}
+
 // ---------- Runtime Blueprint API ----------
 
 UScenecapsAsset* AScenecapsActor::GetCollectionAsset() const

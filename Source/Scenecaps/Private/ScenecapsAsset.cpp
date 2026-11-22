@@ -4,6 +4,7 @@
 
 #include "ScenecapsEntryRegistry.h"
 #include "ScenecapsModule.h"
+#include "ScenecapsActor.h"
 
 #include "Engine/Blueprint.h"
 #include "Engine/Engine.h"
@@ -336,6 +337,7 @@ TArray<AActor*> UScenecapsAsset::SpawnCollectionEx(UObject* WorldContextObject, 
                         {
                             FScenecapsSpawnContext Context;
                             Context.World = World;
+                            Context.EntryId = BaseEntry.EntryId;
                             Context.Transform = InstanceTransforms[InstanceIdx];
                             Context.bIsPreview = false;
                             Context.bIncludeHidden = bIncludeHidden;
@@ -728,6 +730,12 @@ if (MeshToTransforms.Num() == 0) return nullptr;
     ContainerActor->SetActorLabel(FString::Printf(TEXT("ScenecapsISMContainer_%s"), *GetName()));
 #endif
 
+    // 关联到场景 Actor，使变体过渡能定位到批量实例容器
+    if (AScenecapsActor* SceneActor = Cast<AScenecapsActor>(WorldContextObject))
+    {
+        SceneActor->SetISMContainerActor(ContainerActor);
+    }
+
     // 添加运行时管理组件
     UScenecapsISMComponent* Manager = Cast<UScenecapsISMComponent>(ContainerActor->AddComponentByClass(UScenecapsISMComponent::StaticClass(), false, FTransform::Identity, false));
 
@@ -752,28 +760,32 @@ if (MeshToTransforms.Num() == 0) return nullptr;
         ISM->RegisterComponentWithWorld(World);
         ISM->AttachToComponent(Root, FAttachmentTransformRules::KeepRelativeTransform);
 
-        // 槽位数量取条目实际用到的最大值，至少保留 4 个供默认材质使用
-        int32 NumCustomData = 4;
-        if (Contexts)
-        {
-            for (const FScenecapsSpawnContext& Ctx : *Contexts)
-            {
-                NumCustomData = FMath::Max(NumCustomData, Ctx.CustomPrimitiveData.Num());
-            }
-        }
-        ISM->SetNumCustomDataFloats(FMath::Min(NumCustomData, 36));
+        // 预留引擎上限的槽位，变体过渡可直接写入任意插值参数而无需重分配实例数据
+        ISM->SetNumCustomDataFloats(36);
 
-        // 添加实例并还原条目生成时写入的 CustomPrimitiveData
+        // 添加实例、还原 CustomPrimitiveData，并建立条目 -> 实例绑定供变体过渡使用
         for (int32 i = 0; i < Transforms.Num(); ++i)
         {
             ISM->AddInstance(Transforms[i], true);
 
             if (Contexts && Contexts->IsValidIndex(i))
             {
-                const TArray<float>& Data = (*Contexts)[i].CustomPrimitiveData;
+                const FScenecapsSpawnContext& Ctx = (*Contexts)[i];
+                const TArray<float>& Data = Ctx.CustomPrimitiveData;
                 for (int32 c = 0; c < Data.Num() && c < ISM->NumCustomDataFloats; ++c)
                 {
                     ISM->SetCustomDataValue(i, c, Data[c], true);
+                }
+
+                if (Manager && Ctx.EntryId.IsValid())
+                {
+                    FTransform BaseRelative = FTransform::Identity;
+                    if (const FScenecapsEntry* Source = Entries.FindByPredicate(
+                        [&](const FScenecapsEntry& E) { return E.EntryId == Ctx.EntryId; }))
+                    {
+                        BaseRelative = ApplyVariantToEntry(*Source, VariantName).RelativeTransform;
+                    }
+                    Manager->RegisterEntryInstance(Ctx.EntryId, ISM, i, Transforms[i], BaseRelative, Data);
                 }
             }
         }
@@ -840,6 +852,12 @@ AActor* ContainerActor = World->SpawnActor<AActor>();
     ContainerActor->SetActorLabel(FString::Printf(TEXT("ScenecapsHISMContainer_%s"), *GetName()));
 #endif
 
+    // 关联到场景 Actor，使变体过渡能定位到批量实例容器
+    if (AScenecapsActor* SceneActor = Cast<AScenecapsActor>(WorldContextObject))
+    {
+        SceneActor->SetISMContainerActor(ContainerActor);
+    }
+
     // 添加运行时管理组件
     UScenecapsISMComponent* Manager = Cast<UScenecapsISMComponent>(ContainerActor->AddComponentByClass(UScenecapsISMComponent::StaticClass(), false, FTransform::Identity, false));
 
@@ -871,15 +889,8 @@ AActor* ContainerActor = World->SpawnActor<AActor>();
                 NumLODs, LODScreenSize);
         }
 
-        int32 NumCustomData = 4;
-        if (Contexts)
-        {
-            for (const FScenecapsSpawnContext& Ctx : *Contexts)
-            {
-                NumCustomData = FMath::Max(NumCustomData, Ctx.CustomPrimitiveData.Num());
-            }
-        }
-        HISM->SetNumCustomDataFloats(FMath::Min(NumCustomData, 36));
+        // 预留引擎上限的槽位，变体过渡可直接写入任意插值参数
+        HISM->SetNumCustomDataFloats(36);
 
         for (int32 i = 0; i < Transforms.Num(); ++i)
         {
@@ -887,10 +898,22 @@ AActor* ContainerActor = World->SpawnActor<AActor>();
 
             if (Contexts && Contexts->IsValidIndex(i))
             {
-                const TArray<float>& Data = (*Contexts)[i].CustomPrimitiveData;
+                const FScenecapsSpawnContext& Ctx = (*Contexts)[i];
+                const TArray<float>& Data = Ctx.CustomPrimitiveData;
                 for (int32 c = 0; c < Data.Num() && c < HISM->NumCustomDataFloats; ++c)
                 {
                     HISM->SetCustomDataValue(i, c, Data[c], true);
+                }
+
+                if (Manager && Ctx.EntryId.IsValid())
+                {
+                    FTransform BaseRelative = FTransform::Identity;
+                    if (const FScenecapsEntry* Source = Entries.FindByPredicate(
+                        [&](const FScenecapsEntry& E) { return E.EntryId == Ctx.EntryId; }))
+                    {
+                        BaseRelative = ApplyVariantToEntry(*Source, VariantName).RelativeTransform;
+                    }
+                    Manager->RegisterEntryInstance(Ctx.EntryId, HISM, i, Transforms[i], BaseRelative, Data);
                 }
             }
         }

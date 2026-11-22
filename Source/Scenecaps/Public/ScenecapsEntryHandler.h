@@ -48,6 +48,9 @@ struct SCENECAPS_API FScenecapsSpawnContext
 
     /** 条目生成后 PrimitiveComponent 上的 CustomPrimitiveData（扁平 float 数组），供 ISM/HISM 转换保真。 */
     TArray<float> CustomPrimitiveData;
+
+    /** 来源条目 ID，供 ISM/HISM 转换建立条目 -> 实例绑定 */
+    FGuid EntryId;
 };
 
 class SCENECAPS_API IScenecapsEntryHandler
