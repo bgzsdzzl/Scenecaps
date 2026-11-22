@@ -111,11 +111,19 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Biome")
     TSoftObjectPtr<ALandscape> TargetLandscape;
 
-    // 在编辑器中预览生成
+    // 在编辑器中预览生成（蓝图入口，保持原有签名）
     UFUNCTION(BlueprintCallable, Category = "Scenecaps|Biome")
     TArray<FTransform> PreviewGenerate(
         const FTransform& WorldTransform,
         int32 MaxInstances = 1000);
+
+    // 实际采样实现：可选输出每个变换对应选中的 Mesh 与材质覆盖。
+    // 输出数组与返回的变换数组一一对应；仅供 C++ 调用（蓝图不支持 TArray 指针出参）。
+    TArray<FTransform> GeneratePreview(
+        const FTransform& WorldTransform,
+        int32 MaxInstances,
+        TArray<UStaticMesh*>* OutMeshes = nullptr,
+        TArray<UMaterialInterface*>* OutMaterials = nullptr);
 
 // 运行时生成到 ISM/HISM
     UFUNCTION(BlueprintCallable, Category = "Scenecaps|Biome")

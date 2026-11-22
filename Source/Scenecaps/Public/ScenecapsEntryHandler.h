@@ -45,6 +45,9 @@ struct SCENECAPS_API FScenecapsSpawnContext
     TMap<FName, FVector> VectorParams;
     TMap<FName, FLinearColor> ColorParams;
     TMap<FName, bool> BoolParams;
+
+    /** 条目生成后 PrimitiveComponent 上的 CustomPrimitiveData（扁平 float 数组），供 ISM/HISM 转换保真。 */
+    TArray<float> CustomPrimitiveData;
 };
 
 class SCENECAPS_API IScenecapsEntryHandler

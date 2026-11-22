@@ -103,5 +103,5 @@ protected:
     // 内部实现
     TArray<AActor*> CollectActors(UWorld* World, const FScenecapsSnapshotSettings& Settings) const;
     void BuildEntryFromActor(AActor* Actor, FScenecapsEntry& OutEntry, const FTransform& RootTransform) const;
-    FGuid FindOrCreateParentId(const TArray<AActor*>& Actors, AActor* Child, const TMap<AActor*, FGuid>& ActorToId) const;
+    FGuid FindOrCreateParentId(AActor* Child, const TMap<AActor*, FGuid>& ActorToId) const;
 };

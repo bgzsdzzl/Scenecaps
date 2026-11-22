@@ -13,6 +13,6 @@ public:
 private:
     FScenecapsExtensionManager() = default;
 
-    // 可以在这里记录加载的 DLL 句柄等
+    // 从 <ProjectDir>/Plugins/Scenecaps/Extensions/ 加载的 DLL 句柄，Shutdown 时按加载顺序释放
     TArray<void*> LoadedModuleHandles;
 };

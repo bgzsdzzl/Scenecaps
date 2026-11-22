@@ -10,6 +10,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
+#include "Components/PrimitiveComponent.h"
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInterface.h"
 #include "ScenecapsISMComponent.h"
@@ -292,9 +293,8 @@ TArray<AActor*> UScenecapsAsset::SpawnCollectionEx(UObject* WorldContextObject, 
 
     AActor* WorldContextActor = Cast<AActor>(WorldContextObject);
 
-    TMap<FGuid, AActor*>    IdToActor;
-    TMap<FGuid, FTransform> IdToWorld;
-    TSet<FGuid>             Processed;
+    TMap<FGuid, AActor*> IdToActor;
+    TSet<FGuid>          Processed;
 
     TFunction<void(const FScenecapsEntry&, const FTransform&, bool)> SpawnEntry =
         [&](const FScenecapsEntry& BaseEntry, const FTransform& ParentWorld, bool bParentSkipped)
@@ -316,45 +316,64 @@ TArray<AActor*> UScenecapsAsset::SpawnCollectionEx(UObject* WorldContextObject, 
             {
                 if (UObject* Loaded = Entry.Asset.LoadSynchronous())
                 {
-                    FScenecapsSpawnContext Context;
-                    Context.World = World;
-                    Context.Transform = FinalWorld;
-                    Context.bIsPreview = false;
-                    Context.bIncludeHidden = bIncludeHidden;
-
-                    Context.DecalSize = Entry.DecalSize;
-                    Context.bOverrideMobility = Entry.bOverrideMobility;
-                    Context.Mobility = Entry.Mobility;
-                    Context.bOverrideCollision = Entry.bOverrideCollision;
-                    Context.CollisionEnabled = Entry.CollisionEnabled;
-                    Context.bOverrideCastShadow = Entry.bOverrideCastShadow;
-                    Context.bCastShadow = Entry.bCastShadow;
-
-                    Context.MaterialOverride = Entry.MaterialOverride.LoadSynchronous();
-                    Context.MaterialSlotIndex = Entry.MaterialSlotIndex;
-
-                    // 新增：传递自定义参数给 Handler
-                    Context.FloatParams = Entry.FloatParams;
-                    Context.VectorParams = Entry.VectorParams;
-                    Context.ColorParams = Entry.ColorParams;
-                    Context.BoolParams = Entry.BoolParams;
-
                     IScenecapsEntryHandler* Handler =
                         FScenecapsEntryRegistry::Get().FindHandlerForAsset(Loaded);
 
-                    if (AActor* Spawned = Handler ? Handler->SpawnActor(Context, Loaded) : nullptr)
+                    if (Handler)
                     {
-                        if (WorldContextActor && BaseEntry.ParentId == RootId)
+                        // 程序化条目一次生成多个实例；该函数内部已叠加条目相对变换与父级世界变换
+                        TArray<FTransform> InstanceTransforms;
+                        if (Entry.ProceduralParams.IsValid())
                         {
-                            Spawned->AttachToActor(
-                                WorldContextActor,
-                                FAttachmentTransformRules::KeepWorldTransform);
+                            InstanceTransforms = GenerateProceduralTransforms(BaseEntry, ParentWorld, VariantName);
+                        }
+                        if (InstanceTransforms.Num() == 0)
+                        {
+                            InstanceTransforms.Add(FinalWorld);
                         }
 
-                        SpawnedActors.Add(Spawned);
-                        IdToActor.Add(BaseEntry.EntryId, Spawned);
-                        IdToWorld.Add(BaseEntry.EntryId, FinalWorld);
-                        OutEntryToActor.Add(BaseEntry.EntryId, Spawned);
+                        for (int32 InstanceIdx = 0; InstanceIdx < InstanceTransforms.Num(); ++InstanceIdx)
+                        {
+                            FScenecapsSpawnContext Context;
+                            Context.World = World;
+                            Context.Transform = InstanceTransforms[InstanceIdx];
+                            Context.bIsPreview = false;
+                            Context.bIncludeHidden = bIncludeHidden;
+
+                            Context.DecalSize = Entry.DecalSize;
+                            Context.bOverrideMobility = Entry.bOverrideMobility;
+                            Context.Mobility = Entry.Mobility;
+                            Context.bOverrideCollision = Entry.bOverrideCollision;
+                            Context.CollisionEnabled = Entry.CollisionEnabled;
+                            Context.bOverrideCastShadow = Entry.bOverrideCastShadow;
+                            Context.bCastShadow = Entry.bCastShadow;
+
+                            Context.MaterialOverride = Entry.MaterialOverride.LoadSynchronous();
+                            Context.MaterialSlotIndex = Entry.MaterialSlotIndex;
+
+                            Context.FloatParams = Entry.FloatParams;
+                            Context.VectorParams = Entry.VectorParams;
+                            Context.ColorParams = Entry.ColorParams;
+                            Context.BoolParams = Entry.BoolParams;
+
+                            if (AActor* Spawned = Handler->SpawnActor(Context, Loaded))
+                            {
+                                // 只把首个实例登记为条目的代表 Actor，用于父子挂接与插值映射
+                                if (InstanceIdx == 0 && WorldContextActor && BaseEntry.ParentId == RootId)
+                                {
+                                    Spawned->AttachToActor(
+                                        WorldContextActor,
+                                        FAttachmentTransformRules::KeepWorldTransform);
+                                }
+
+                                SpawnedActors.Add(Spawned);
+                                if (InstanceIdx == 0)
+                                {
+                                    IdToActor.Add(BaseEntry.EntryId, Spawned);
+                                    OutEntryToActor.Add(BaseEntry.EntryId, Spawned);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -636,8 +655,7 @@ static void SetupISMForLumen(UInstancedStaticMeshComponent* ISM, const FScenecap
     ISM->SetCanEverAffectNavigation(false);
     ISM->bHasPerInstanceHitProxies = false;
 
-    // Per-instance custom data（材质参数驱动）
-    ISM->SetNumCustomDataFloats(4);
+    // Per-instance custom data 的槽位数量由调用方按条目实际数据设置，此处不再写死
 }
 
 static void SetupHISMForLumen(UHierarchicalInstancedStaticMeshComponent* HISM, const FScenecapsSpawnContext& Context = FScenecapsSpawnContext())
@@ -693,6 +711,7 @@ UInstancedStaticMeshComponent* UScenecapsAsset::SpawnCollectionAsISM(UObject* Wo
                 FScenecapsSpawnContext Context;
                 Context.Transform = InstanceTransform;
                 Context.MaterialOverride = MeshComp->GetMaterial(0);
+                Context.CustomPrimitiveData = MeshComp->GetCustomPrimitiveData().Data;
                 MeshToContexts.FindOrAdd(Mesh).Add(Context);
             }
         }
@@ -733,16 +752,29 @@ if (MeshToTransforms.Num() == 0) return nullptr;
         ISM->RegisterComponentWithWorld(World);
         ISM->AttachToComponent(Root, FAttachmentTransformRules::KeepRelativeTransform);
 
-        // 添加实例
+        // 槽位数量取条目实际用到的最大值，至少保留 4 个供默认材质使用
+        int32 NumCustomData = 4;
+        if (Contexts)
+        {
+            for (const FScenecapsSpawnContext& Ctx : *Contexts)
+            {
+                NumCustomData = FMath::Max(NumCustomData, Ctx.CustomPrimitiveData.Num());
+            }
+        }
+        ISM->SetNumCustomDataFloats(FMath::Min(NumCustomData, 36));
+
+        // 添加实例并还原条目生成时写入的 CustomPrimitiveData
         for (int32 i = 0; i < Transforms.Num(); ++i)
         {
             ISM->AddInstance(Transforms[i], true);
 
-            // 可选：写入 PerInstanceCustomData 供材质使用
             if (Contexts && Contexts->IsValidIndex(i))
             {
-                const FScenecapsSpawnContext& Ctx = (*Contexts)[i];
-                // 示例：ISM->SetCustomDataValue(i, 0, Ctx.FloatParams.FindRef("Density"), true);
+                const TArray<float>& Data = (*Contexts)[i].CustomPrimitiveData;
+                for (int32 c = 0; c < Data.Num() && c < ISM->NumCustomDataFloats; ++c)
+                {
+                    ISM->SetCustomDataValue(i, c, Data[c], true);
+                }
             }
         }
 
@@ -792,6 +824,7 @@ UHierarchicalInstancedStaticMeshComponent* UScenecapsAsset::SpawnCollectionAsHIS
                 FScenecapsSpawnContext Context;
                 Context.Transform = InstanceTransform;
                 Context.MaterialOverride = MeshComp->GetMaterial(0);
+                Context.CustomPrimitiveData = MeshComp->GetCustomPrimitiveData().Data;
                 MeshToContexts.FindOrAdd(Mesh).Add(Context);
             }
         }
@@ -830,9 +863,23 @@ AActor* ContainerActor = World->SpawnActor<AActor>();
         HISM->RegisterComponentWithWorld(World);
         HISM->AttachToComponent(Root, FAttachmentTransformRules::KeepRelativeTransform);
 
-        // HISM->NumLODs = FMath::Clamp(NumLODs, 1, 8); // Use SetNumLODs if available
-        // HISM->LODScreenSize = LODScreenSize; // Use SetLODScreenSize if available
-        HISM->PerInstanceSMData.Empty();
+        // UE 5.8 的 HISM 没有组件级 LOD 数量/屏幕尺寸 API，LOD 由 StaticMesh 的 LOD 组决定
+        if (NumLODs > 0 || LODScreenSize > 0.0f)
+        {
+            UE_LOG(LogScenecaps, Verbose,
+                TEXT("HISM LOD overrides are not available in UE 5.8 (NumLODs=%d, ScreenSize=%.2f); using mesh LOD settings."),
+                NumLODs, LODScreenSize);
+        }
+
+        int32 NumCustomData = 4;
+        if (Contexts)
+        {
+            for (const FScenecapsSpawnContext& Ctx : *Contexts)
+            {
+                NumCustomData = FMath::Max(NumCustomData, Ctx.CustomPrimitiveData.Num());
+            }
+        }
+        HISM->SetNumCustomDataFloats(FMath::Min(NumCustomData, 36));
 
         for (int32 i = 0; i < Transforms.Num(); ++i)
         {
@@ -840,7 +887,11 @@ AActor* ContainerActor = World->SpawnActor<AActor>();
 
             if (Contexts && Contexts->IsValidIndex(i))
             {
-                // const FScenecapsSpawnContext& Ctx = (*Contexts)[i];
+                const TArray<float>& Data = (*Contexts)[i].CustomPrimitiveData;
+                for (int32 c = 0; c < Data.Num() && c < HISM->NumCustomDataFloats; ++c)
+                {
+                    HISM->SetCustomDataValue(i, c, Data[c], true);
+                }
             }
         }
 

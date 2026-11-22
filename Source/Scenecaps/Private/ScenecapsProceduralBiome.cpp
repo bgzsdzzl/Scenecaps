@@ -14,7 +14,16 @@
 #include "ScenecapsAsset.h"
 #include "ScenecapsISMComponent.h"
 
-
+namespace
+{
+    // 按实际选中的 Mesh 与材质覆盖分组后的实例数据
+    struct FBiomeMeshGroup
+    {
+        UStaticMesh* Mesh = nullptr;
+        UMaterialInterface* Material = nullptr;
+        TArray<FTransform> Transforms;
+    };
+}
 
 TArray<FScenecapsBiomeEntry> UScenecapsBiomeAsset::QueryEntriesAtLocation(
     const FVector& WorldLocation,
@@ -98,6 +107,19 @@ TArray<FTransform> UScenecapsBiomeSamplerComponent::PreviewGenerate(
     const FTransform& WorldTransform,
     int32 MaxInstances)
 {
+    return GeneratePreview(WorldTransform, MaxInstances);
+}
+
+TArray<FTransform> UScenecapsBiomeSamplerComponent::GeneratePreview(
+    const FTransform& WorldTransform,
+    int32 MaxInstances,
+    TArray<UStaticMesh*>* OutMeshes,
+    TArray<UMaterialInterface*>* OutMaterials)
+{
+    // 输出数组与返回的变换数组一一对应
+    if (OutMeshes) OutMeshes->Reset();
+    if (OutMaterials) OutMaterials->Reset();
+
     TArray<FTransform> Result;
     
     UScenecapsBiomeAsset* Asset = BiomeAsset.LoadSynchronous();
@@ -145,6 +167,10 @@ TArray<FTransform> UScenecapsBiomeSamplerComponent::PreviewGenerate(
 
         if (!SelectedEntry) continue;
 
+        // 同步输出加权随机选中的 Mesh 与材质覆盖（可能为 null，保持数组对齐）
+        if (OutMeshes) OutMeshes->Add(SelectedEntry->Mesh.LoadSynchronous());
+        if (OutMaterials) OutMaterials->Add(SelectedEntry->MaterialOverride.LoadSynchronous());
+
         FTransform LocalTransform = WorldTransform;
         LocalTransform.SetLocation(WorldPos);
 
@@ -184,31 +210,43 @@ UInstancedStaticMeshComponent* UScenecapsBiomeSamplerComponent::GenerateToISM(
     UScenecapsBiomeAsset* Asset = BiomeAsset.LoadSynchronous();
     if (!Asset) return nullptr;
 
-    // 生成预览变换
-    TArray<FTransform> Transforms = PreviewGenerate(WorldTransform, 10000);
+    // 生成预览变换，并同步取得每个变换实际选中的 Mesh 与材质覆盖
+    TArray<UStaticMesh*> Meshes;
+    TArray<UMaterialInterface*> Materials;
+    const TArray<FTransform> Transforms = GeneratePreview(WorldTransform, 10000, &Meshes, &Materials);
     if (Transforms.Num() == 0) return nullptr;
 
-    // 按 Mesh 分组
-    TMap<UStaticMesh*, TArray<FTransform>> MeshToTransforms;
-    for (const FTransform& Transform : Transforms)
+    // 按实际选中的 Mesh 与材质覆盖分组
+    TArray<FBiomeMeshGroup> Groups;
+    for (int32 i = 0; i < Transforms.Num(); ++i)
     {
-        // 这里简化：使用第一个 Layer 的第一个 Entry 的 Mesh
-        // 实际应该根据生成逻辑选择 Mesh
-        if (Asset->Layers.Num() > 0 && Asset->Layers[0].Entries.Num() > 0)
+        UStaticMesh* Mesh = Meshes.IsValidIndex(i) ? Meshes[i] : nullptr;
+        if (!Mesh) continue;
+
+        UMaterialInterface* Material = Materials.IsValidIndex(i) ? Materials[i] : nullptr;
+
+        FBiomeMeshGroup* Group = nullptr;
+        for (FBiomeMeshGroup& Existing : Groups)
         {
-            UStaticMesh* Mesh = Asset->Layers[0].Entries[0].Mesh.LoadSynchronous();
-            if (Mesh)
+            if (Existing.Mesh == Mesh && Existing.Material == Material)
             {
-                MeshToTransforms.FindOrAdd(Mesh).Add(Transform);
+                Group = &Existing;
+                break;
             }
         }
+        if (!Group)
+        {
+            Group = &Groups.AddDefaulted_GetRef();
+            Group->Mesh = Mesh;
+            Group->Material = Material;
+        }
+        Group->Transforms.Add(Transforms[i]);
     }
 
-    if (MeshToTransforms.Num() == 0) return nullptr;
+    if (Groups.Num() == 0) return nullptr;
 
     // 创建或使用容器 Actor
     AActor* TargetContainer = ContainerActor;
-    bool bOwnsContainer = false;
     if (!TargetContainer)
     {
         TargetContainer = World->SpawnActor<AActor>();
@@ -216,7 +254,6 @@ UInstancedStaticMeshComponent* UScenecapsBiomeSamplerComponent::GenerateToISM(
 #if WITH_EDITOR
         TargetContainer->SetActorLabel(TEXT("BiomeISMContainer"));
 #endif
-        bOwnsContainer = true;
     }
 
     // 添加管理组件
@@ -235,19 +272,20 @@ UInstancedStaticMeshComponent* UScenecapsBiomeSamplerComponent::GenerateToISM(
 
     UInstancedStaticMeshComponent* FirstISM = nullptr;
 
-    // 为每个 Mesh 创建 ISM
-    for (auto& Pair : MeshToTransforms)
+    // 为每个实际选中的 Mesh 创建 ISM
+    for (const FBiomeMeshGroup& Group : Groups)
     {
-        UStaticMesh* Mesh = Pair.Key;
-        const TArray<FTransform>& MeshTransforms = Pair.Value;
-
         UInstancedStaticMeshComponent* ISM = NewObject<UInstancedStaticMeshComponent>(TargetContainer);
-        ISM->SetStaticMesh(Mesh);
+        ISM->SetStaticMesh(Group.Mesh);
+        if (Group.Material)
+        {
+            ISM->SetMaterial(0, Group.Material);
+        }
         ISM->RegisterComponentWithWorld(World);
         ISM->AttachToComponent(Root, FAttachmentTransformRules::KeepRelativeTransform);
 
         // 添加实例
-        for (const FTransform& Transform : MeshTransforms)
+        for (const FTransform& Transform : Group.Transforms)
         {
             ISM->AddInstance(Transform, true);
         }
@@ -283,29 +321,43 @@ UHierarchicalInstancedStaticMeshComponent* UScenecapsBiomeSamplerComponent::Gene
     UScenecapsBiomeAsset* Asset = BiomeAsset.LoadSynchronous();
     if (!Asset) return nullptr;
 
-    // 生成预览变换
-    TArray<FTransform> Transforms = PreviewGenerate(WorldTransform, 10000);
+    // 生成预览变换，并同步取得每个变换实际选中的 Mesh 与材质覆盖
+    TArray<UStaticMesh*> Meshes;
+    TArray<UMaterialInterface*> Materials;
+    const TArray<FTransform> Transforms = GeneratePreview(WorldTransform, 10000, &Meshes, &Materials);
     if (Transforms.Num() == 0) return nullptr;
 
-    // 按 Mesh 分组
-    TMap<UStaticMesh*, TArray<FTransform>> MeshToTransforms;
-    for (const FTransform& Transform : Transforms)
+    // 按实际选中的 Mesh 与材质覆盖分组
+    TArray<FBiomeMeshGroup> Groups;
+    for (int32 i = 0; i < Transforms.Num(); ++i)
     {
-        if (Asset->Layers.Num() > 0 && Asset->Layers[0].Entries.Num() > 0)
+        UStaticMesh* Mesh = Meshes.IsValidIndex(i) ? Meshes[i] : nullptr;
+        if (!Mesh) continue;
+
+        UMaterialInterface* Material = Materials.IsValidIndex(i) ? Materials[i] : nullptr;
+
+        FBiomeMeshGroup* Group = nullptr;
+        for (FBiomeMeshGroup& Existing : Groups)
         {
-            UStaticMesh* Mesh = Asset->Layers[0].Entries[0].Mesh.LoadSynchronous();
-            if (Mesh)
+            if (Existing.Mesh == Mesh && Existing.Material == Material)
             {
-                MeshToTransforms.FindOrAdd(Mesh).Add(Transform);
+                Group = &Existing;
+                break;
             }
         }
+        if (!Group)
+        {
+            Group = &Groups.AddDefaulted_GetRef();
+            Group->Mesh = Mesh;
+            Group->Material = Material;
+        }
+        Group->Transforms.Add(Transforms[i]);
     }
 
-    if (MeshToTransforms.Num() == 0) return nullptr;
+    if (Groups.Num() == 0) return nullptr;
 
     // 创建或使用容器 Actor
     AActor* TargetContainer = ContainerActor;
-    bool bOwnsContainer = false;
     if (!TargetContainer)
     {
         TargetContainer = World->SpawnActor<AActor>();
@@ -313,7 +365,6 @@ UHierarchicalInstancedStaticMeshComponent* UScenecapsBiomeSamplerComponent::Gene
 #if WITH_EDITOR
         TargetContainer->SetActorLabel(TEXT("BiomeHISMContainer"));
 #endif
-        bOwnsContainer = true;
     }
 
     // 添加管理组件
@@ -332,19 +383,20 @@ UHierarchicalInstancedStaticMeshComponent* UScenecapsBiomeSamplerComponent::Gene
 
     UHierarchicalInstancedStaticMeshComponent* FirstHISM = nullptr;
 
-    // 为每个 Mesh 创建 HISM
-    for (auto& Pair : MeshToTransforms)
+    // 为每个实际选中的 Mesh 创建 HISM
+    for (const FBiomeMeshGroup& Group : Groups)
     {
-        UStaticMesh* Mesh = Pair.Key;
-        const TArray<FTransform>& MeshTransforms = Pair.Value;
-
         UHierarchicalInstancedStaticMeshComponent* HISM = NewObject<UHierarchicalInstancedStaticMeshComponent>(TargetContainer);
-        HISM->SetStaticMesh(Mesh);
+        HISM->SetStaticMesh(Group.Mesh);
+        if (Group.Material)
+        {
+            HISM->SetMaterial(0, Group.Material);
+        }
         HISM->RegisterComponentWithWorld(World);
         HISM->AttachToComponent(Root, FAttachmentTransformRules::KeepRelativeTransform);
         HISM->PerInstanceSMData.Empty();
 
-        for (const FTransform& Transform : MeshTransforms)
+        for (const FTransform& Transform : Group.Transforms)
         {
             HISM->AddInstance(Transform, true);
         }
