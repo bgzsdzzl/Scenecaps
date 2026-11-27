@@ -19,9 +19,14 @@
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Input/SMenuAnchor.h"
 
+#include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/SkyLightComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/Material.h"
+#include "Materials/MaterialInstanceConstant.h"
+#include "UObject/Package.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Engine/SkyLight.h"
 #include "Engine/DirectionalLight.h"
@@ -301,36 +306,98 @@ void FScenecapsEditorToolkit::SetHDRISkyboxTexture(UTextureCube* InTexture)
     ApplyHDRISkyboxToPreview();
 }
 
+void FScenecapsEditorToolkit::EnsureHDRISkySphere()
+{
+    if (!PreviewScene.IsValid() || HDRISkySphere.IsValid()) return;
+
+    // 与引擎 FAdvancedPreviewScene 一致：反法线球 + bIsSky 材质，使 HDRI 作为可见天空背景
+    UStaticMesh* SphereMesh = LoadObject<UStaticMesh>(nullptr,
+        TEXT("/Engine/EditorMeshes/AssetViewer/Sphere_inversenormals.Sphere_inversenormals"));
+    UMaterial* SkyMaterial = LoadObject<UMaterial>(nullptr,
+        TEXT("/Engine/EditorMaterials/AssetViewer/M_SkyBox.M_SkyBox"));
+    if (!SphereMesh || !SkyMaterial) return;
+
+    UMaterialInstanceConstant* MaterialInstance = NewObject<UMaterialInstanceConstant>(GetTransientPackage());
+    MaterialInstance->Parent = SkyMaterial;
+    MaterialInstance->PostLoad();
+
+    UStaticMeshComponent* SphereComponent = NewObject<UStaticMeshComponent>(GetTransientPackage());
+    SphereComponent->SetStaticMesh(SphereMesh);
+    SphereComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    SphereComponent->CastShadow = false;
+    SphereComponent->bCastDynamicShadow = false;
+    SphereComponent->SetMaterial(0, MaterialInstance);
+
+    // 原点、2000 倍缩放，与引擎资产查看器一致
+    const FTransform SphereTransform(FRotator::ZeroRotator, FVector::ZeroVector, FVector(2000));
+    PreviewScene->AddComponent(SphereComponent, SphereTransform);
+    SphereComponent->SetVisibility(false, true);
+
+    HDRISkySphere = SphereComponent;
+    HDRISkyMaterialInstance = MaterialInstance;
+}
+
 void FScenecapsEditorToolkit::ApplyHDRISkyboxToPreview()
 {
     const UScenecapsViewportSettings* Settings = GetViewportSettings();
     const bool bEnabled = IsHDRISkyboxEnabled();
     UTextureCube* HDRI = bEnabled ? Settings->HDRISkyboxTexture.LoadSynchronous() : nullptr;
 
-    if (PreviewScene.IsValid())
+    if (!PreviewScene.IsValid()) return;
+
+    EnsureHDRISkySphere();
+
+    // 可见天空背景：通过天空球材质的 cubemap 参数切换，而非 SkyLighting show flag
+    UMaterialInstanceConstant* SkyMat = HDRISkyMaterialInstance.Get();
+    if (SkyMat)
     {
-        if (USkyLightComponent* SkyLight = PreviewScene->SkyLight)
+        static const FName SkyBoxParam(TEXT("SkyBox"));
+        UTexture* CurrentTexture = nullptr;
+        SkyMat->GetTextureParameterValue(SkyBoxParam, CurrentTexture);
+        if (CurrentTexture != static_cast<UTexture*>(HDRI))
         {
-            if (bEnabled && HDRI)
-            {
-                SkyLight->SetVisibility(true);
-                SkyLight->SetIntensity(Settings->HDRISkyboxIntensity);
-                SkyLight->SourceType = SLS_SpecifiedCubemap;
-                SkyLight->SetCubemap(HDRI);
-            }
-            else
-            {
-                SkyLight->SetVisibility(false);
-                SkyLight->SetIntensity(0.0f);
-            }
+            SkyMat->SetTextureParameterValueEditorOnly(SkyBoxParam, HDRI);
+            SkyMat->SetScalarParameterValueEditorOnly(FName(TEXT("CubemapRotation")), 0.0f);
+            SkyMat->SetScalarParameterValueEditorOnly(FName(TEXT("Intensity")), Settings->HDRISkyboxIntensity);
+            SkyMat->PostEditChange();
         }
     }
+
+    UStaticMeshComponent* SkySphere = HDRISkySphere.Get();
+    if (SkySphere)
+    {
+        SkySphere->SetVisibility(HDRI != nullptr, true);
+    }
+
+    // IBL 照明：bDefaultLighting=false 时预览场景没有 SkyLight，需要自建一个
+    if (!PreviewScene->SkyLight)
+    {
+        USkyLightComponent* NewSkyLight = NewObject<USkyLightComponent>(GetTransientPackage(), NAME_None, RF_Transient);
+        NewSkyLight->Mobility = EComponentMobility::Movable;
+        NewSkyLight->bLowerHemisphereIsBlack = false;
+        NewSkyLight->SourceType = SLS_SpecifiedCubemap;
+        NewSkyLight->Intensity = 0.0f;
+        PreviewScene->SkyLight = NewSkyLight;
+        PreviewScene->AddComponent(NewSkyLight, FTransform::Identity);
+    }
+
+    if (USkyLightComponent* SkyLight = PreviewScene->SkyLight)
+    {
+        SkyLight->SetVisibility(HDRI != nullptr);
+        SkyLight->SetIntensity(HDRI ? Settings->HDRISkyboxIntensity : 0.0f);
+        SkyLight->SourceType = SLS_SpecifiedCubemap;
+        if (HDRI) SkyLight->SetCubemap(HDRI);
+        SkyLight->SetCaptureIsDirty();
+        SkyLight->MarkRenderStateDirty();
+    }
+
+    // 驱动一次天空捕获，避免 capture 长时间处于 dirty/未初始化状态导致帧间闪烁
+    PreviewScene->UpdateCaptureContents();
 
     if (TSharedPtr<SScenecapsEditorViewport> Viewport = ViewportWidget.Pin())
     {
         if (TSharedPtr<FScenecapsEditorViewportClient> Client = Viewport->GetScenecapsViewportClient())
         {
-            Client->GetEngineShowFlagsPublic()->SetSkyLighting(bEnabled);
             Client->RequestRedraw();
         }
     }

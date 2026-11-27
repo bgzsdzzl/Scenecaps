@@ -8,7 +8,6 @@
 #include "CollisionQueryParams.h"
 #include "Framework/Application/SlateApplication.h"
 #include "ScenecapsAsset.h"
-#include "ScenecapsViewportConfig.h"
 
 FScenecapsEditorViewportClient::FScenecapsEditorViewportClient(
     FPreviewScene* InPreviewScene,
@@ -18,6 +17,10 @@ FScenecapsEditorViewportClient::FScenecapsEditorViewportClient(
     , ToolkitPtr(InToolkit)
 {
     SetViewMode(VMI_Lit);
+
+    // 与蓝图/材质编辑器一致：关闭 TAA / ScreenPercentage / EyeAdaptation 等高级特性，
+    // 避免非实时视口下 temporal history 与自动曝光交替导致的白闪
+    EngineShowFlags.DisableAdvancedFeatures();
 
     // Grid settings using DrawHelper (like the old working version)
     DrawHelper.bDrawGrid = true;
@@ -29,12 +32,7 @@ FScenecapsEditorViewportClient::FScenecapsEditorViewportClient(
 
     SetRealtime(false);
 
-    // HDRI 天空盒默认关闭；仅在用户已保存有效 HDRI 配置时开启天空渲染
-    const UScenecapsViewportSettings* ViewportSettings = GetDefault<UScenecapsViewportSettings>();
-    const bool bUseHDRISkybox = ViewportSettings->bEnableHDRISkybox && !ViewportSettings->HDRISkyboxTexture.IsNull();
-    EngineShowFlags.SetSkyLighting(bUseHDRISkybox);
-
-    SetRealtime(false);
+    // SkyLighting 保持引擎默认的 ON（只影响 IBL），可见天空由天空球控制，不在运行时翻转此 flag
 
     // Frame the default scene bounds (like old version)
     FocusViewportOnBox(FBox(FVector(-100.f), FVector(100.f)));
@@ -43,6 +41,15 @@ FScenecapsEditorViewportClient::FScenecapsEditorViewportClient(
 void FScenecapsEditorViewportClient::Tick(float DeltaSeconds)
 {
     FEditorViewportClient::Tick(DeltaSeconds);
+
+    // 与 FAdvancedPreviewScene 一致：持续驱动天空捕获，避免 HDRI dirty 状态导致帧间闪烁
+    if (TSharedPtr<FScenecapsEditorToolkit> Toolkit = ToolkitPtr.Pin())
+    {
+        if (FPreviewScene* Scene = Toolkit->GetPreviewScene())
+        {
+            Scene->UpdateCaptureContents();
+        }
+    }
 }
 
 FLinearColor FScenecapsEditorViewportClient::GetBackgroundColor() const
