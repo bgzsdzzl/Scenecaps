@@ -21,6 +21,8 @@ class SBox;
 class UScenecapsViewportSettings;
 class UTextureCube;
 class SMenuAnchor;
+class UStaticMeshComponent;
+class UMaterialInstanceConstant;
 
 class SCENECAPSEDITOR_API FScenecapsEditorToolkit : public FAssetEditorToolkit
 {
@@ -84,6 +86,9 @@ TWeakPtr<SScenecapsEditorViewport> GetViewportWidget() const { return ViewportWi
     void ApplyHDRISkyboxToPreview();
 
 private:
+    /** 惰性创建 HDRI 天空球（反法线球 + bIsSky 材质实例），仅首次启用时构造 */
+    void EnsureHDRISkySphere();
+
     TSharedRef<SDockTab> SpawnTab_Viewport(const FSpawnTabArgs& Args);
     TSharedRef<SWidget> MakeHDRIAssetPicker();
     void HandleHDRIAssetSelected(const FAssetData& AssetData);
@@ -112,6 +117,10 @@ private:
     TSharedPtr<SWidget> DetailsAssetWidget;
 
     TSharedPtr<SMenuAnchor> HDRIPickerAnchor;
+
+    /** HDRI 天空球与其材质实例（由 PreviewScene 持有，这里只保留弱引用） */
+    TWeakObjectPtr<UStaticMeshComponent> HDRISkySphere;
+    TWeakObjectPtr<UMaterialInstanceConstant> HDRISkyMaterialInstance;
 
     TSharedPtr<FStructOnScope> DetailsStructScope;
     TSharedPtr<FStructOnScope> BatchDetailsScope;
